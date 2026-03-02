@@ -269,6 +269,32 @@
         }
 
         document.addEventListener('keydown', e => { if (e.key === 'Escape') closeModal(); });
-    </script>
+    
+
+        // 监听其他页面（视频APP）的数据变化
+        window.addEventListener('storage', function(e) {
+            if (e.key === 'gdx_users') {
+                console.log('检测到账号数据更新，正在同步...');
+                // 重新读取数据
+                users = JSON.parse(localStorage.getItem('gdx_users')) || users;
+                render();
+            }
+        });
+
+        // 页面重新可见时刷新数据（处理同页面切换）
+        document.addEventListener('visibilitychange', function() {
+            if (!document.hidden) {
+                const newData = localStorage.getItem('gdx_users');
+                if (newData) {
+                    const parsed = JSON.parse(newData);
+                    if (JSON.stringify(parsed) !== JSON.stringify(users)) {
+                        console.log('页面激活，数据已更新');
+                        users = parsed;
+                        render();
+                    }
+                }
+            }
+        });
+</script>
 </body>
 </html>
