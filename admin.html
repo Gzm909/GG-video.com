@@ -24,8 +24,11 @@
             background: rgba(0, 212, 255, 0.05);
         }
         .upload-zone.has-file { border-color: #10b981; background: rgba(16, 185, 129, 0.05); }
-        /* 紧凑模式 */
-        .compact-modal { max-height: 85vh; overflow-y: auto; }
+        .tab-active { background: linear-gradient(135deg, #00d4ff 0%, #7b2cbf 100%); color: white; }
+        .tab-inactive { background: rgba(255,255,255,0.1); color: #94a3b8; }
+        .tab-inactive:hover { background: rgba(255,255,255,0.2); color: white; }
+        .url-input:focus { border-color: #00d4ff; box-shadow: 0 0 0 3px rgba(0, 212, 255, 0.1); }
+        #urlPreviewPlayer { background: #000; border-radius: 8px; }
     </style>
     <script>
         tailwind.config = {
@@ -33,12 +36,12 @@
             theme: { extend: { colors: { primary: '#00d4ff', secondary: '#7b2cbf', dark: '#0f172a', surface: '#1e293b' } } }
         }
     </script>
+<base target="_blank">
 </head>
 <body class="bg-gradient-to-br from-gray-900 via-blue-900 to-gray-900 min-h-screen text-white">
 
     <!-- API配置 - 自动检测 -->
     <script>
-        // 自动检测API地址（开发/生产环境自适应）
         const API_BASE = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1' 
             ? 'http://localhost:3000' 
             : `http://${window.location.hostname}:3000`;
@@ -135,7 +138,7 @@
             <div class="flex justify-between items-center mb-6">
                 <h2 class="text-2xl font-bold">视频管理</h2>
                 <button onclick="openVideoModal()" class="px-6 py-2 bg-cyan-400 text-black font-bold rounded-lg hover:scale-105 transition-transform">
-                    <i class="fas fa-cloud-upload-alt mr-2"></i>上传视频
+                    <i class="fas fa-cloud-upload-alt mr-2"></i>添加视频
                 </button>
             </div>
 
@@ -164,7 +167,7 @@
                         <tr>
                             <th class="px-6 py-4 text-sm font-semibold text-gray-400">封面</th>
                             <th class="px-6 py-4 text-sm font-semibold text-gray-400">标题</th>
-                            <th class="px-6 py-4 text-sm font-semibold text-gray-400">大小</th>
+                            <th class="px-6 py-4 text-sm font-semibold text-gray-400">来源</th>
                             <th class="px-6 py-4 text-sm font-semibold text-gray-400">权限</th>
                             <th class="px-6 py-4 text-sm font-semibold text-gray-400 text-right">操作</th>
                         </tr>
@@ -194,117 +197,214 @@
         </div>
     </div>
 
-    <!-- 【紧凑版】视频上传模态框 -->
+    <!-- 【双模式】视频上传模态框 - 支持本地上传和URL上传 -->
     <div id="videoModal" style="display:none;" class="fixed inset-0 z-[60] flex items-center justify-center bg-black/80 backdrop-blur-sm p-4">
-        <div class="glass rounded-2xl p-5 w-full max-w-lg compact-modal">
-            <div class="flex justify-between items-center mb-4">
-                <h3 class="text-lg font-bold">上传视频</h3>
-                <button onclick="closeVideoModal()" class="w-8 h-8 rounded-full bg-gray-700 flex items-center justify-center hover:bg-gray-600">
+        <div class="glass rounded-2xl w-full max-w-2xl max-h-[90vh] overflow-hidden flex flex-col">
+            <!-- 头部 -->
+            <div class="flex justify-between items-center p-6 border-b border-gray-700">
+                <h3 class="text-xl font-bold">添加视频</h3>
+                <button onclick="closeVideoModal()" class="w-8 h-8 rounded-full bg-gray-700 flex items-center justify-center hover:bg-gray-600 transition-colors">
                     <i class="fas fa-times"></i>
                 </button>
             </div>
-            
-            <!-- 上传进度 -->
-            <div id="uploadProgress" class="hidden mb-4">
-                <div class="flex justify-between text-xs mb-1">
-                    <span class="text-cyan-400" id="uploadStatus">准备上传...</span>
-                    <span class="text-white" id="uploadPercent">0%</span>
-                </div>
-                <div class="w-full bg-gray-700 rounded-full h-1.5">
-                    <div id="progressBar" class="bg-gradient-to-r from-cyan-400 to-purple-500 h-1.5 rounded-full transition-all" style="width: 0%"></div>
-                </div>
+
+            <!-- 上传方式切换标签 -->
+            <div class="flex p-4 gap-2 border-b border-gray-700">
+                <button onclick="switchUploadMode('local')" id="tabLocal" class="flex-1 py-2 px-4 rounded-lg font-medium transition-all tab-active">
+                    <i class="fas fa-upload mr-2"></i>本地上传
+                </button>
+                <button onclick="switchUploadMode('url')" id="tabUrl" class="flex-1 py-2 px-4 rounded-lg font-medium transition-all tab-inactive">
+                    <i class="fas fa-link mr-2"></i>链接导入
+                </button>
             </div>
 
-            <div class="space-y-3">
-                <!-- 标题 -->
-                <div>
-                    <label class="block text-xs text-gray-400 mb-1">视频标题 <span class="text-red-400">*</span></label>
-                    <input type="text" id="videoTitle" required class="w-full px-3 py-2 rounded-lg bg-gray-800 border border-gray-700 focus:border-cyan-400 outline-none text-white text-sm" placeholder="请输入视频标题">
-                </div>
+            <!-- 内容区域 -->
+            <div class="flex-1 overflow-y-auto p-6">
+                
+                <!-- 本地上传模式 -->
+                <div id="localUploadPanel" class="space-y-4">
+                    <!-- 上传进度 -->
+                    <div id="uploadProgress" class="hidden">
+                        <div class="flex justify-between text-sm mb-2">
+                            <span class="text-cyan-400" id="uploadStatus">准备上传...</span>
+                            <span class="text-white font-mono" id="uploadPercent">0%</span>
+                        </div>
+                        <div class="w-full bg-gray-700 rounded-full h-2">
+                            <div id="progressBar" class="bg-gradient-to-r from-cyan-400 to-purple-500 h-2 rounded-full transition-all duration-300" style="width: 0%"></div>
+                        </div>
+                    </div>
 
-                <!-- 上传区域 - 并排 -->
-                <div class="grid grid-cols-2 gap-3">
-                    <!-- 封面上传 -->
+                    <!-- 标题 -->
                     <div>
-                        <label class="block text-xs text-gray-400 mb-1">封面 <span class="text-red-400">*</span></label>
-                        <div id="coverZone" class="upload-zone rounded-lg p-2 cursor-pointer relative" onclick="document.getElementById('coverInput').click()">
-                            <input type="file" id="coverInput" accept="image/jpeg,image/png,image/webp" class="hidden" onchange="handleFileSelect('cover', this)">
-                            <div id="coverPlaceholder" class="text-center py-3">
-                                <i class="fas fa-image text-xl text-gray-500 mb-1"></i>
-                                <p class="text-xs text-gray-400">点击上传</p>
-                                <p class="text-[10px] text-gray-600">JPG/PNG</p>
+                        <label class="block text-sm text-gray-400 mb-2">视频标题 <span class="text-red-400">*</span></label>
+                        <input type="text" id="localVideoTitle" class="w-full px-4 py-3 rounded-xl bg-gray-800 border border-gray-700 focus:border-cyan-400 outline-none text-white transition-colors" placeholder="请输入视频标题">
+                    </div>
+
+                    <!-- 文件上传区域 -->
+                    <div class="grid grid-cols-2 gap-4">
+                        <!-- 封面上传 -->
+                        <div>
+                            <label class="block text-sm text-gray-400 mb-2">封面图片 <span class="text-red-400">*</span></label>
+                            <div id="coverZone" class="upload-zone rounded-xl p-4 cursor-pointer relative h-32 flex items-center justify-center" onclick="document.getElementById('coverInput').click()">
+                                <input type="file" id="coverInput" accept="image/*" class="hidden" onchange="handleFileSelect('cover', this)">
+                                <div id="coverPlaceholder" class="text-center">
+                                    <i class="fas fa-image text-3xl text-gray-500 mb-2"></i>
+                                    <p class="text-sm text-gray-400">点击上传封面</p>
+                                    <p class="text-xs text-gray-600 mt-1">支持 JPG、PNG</p>
+                                </div>
+                                <div id="coverPreview" class="hidden absolute inset-0 p-2">
+                                    <img class="w-full h-full object-cover rounded-lg">
+                                    <button onclick="event.stopPropagation(); clearFile('cover')" class="absolute top-1 right-1 w-6 h-6 bg-red-500 rounded-full text-white text-xs flex items-center justify-center hover:bg-red-600 transition-colors">
+                                        <i class="fas fa-times"></i>
+                                    </button>
+                                </div>
                             </div>
-                            <div id="coverPreview" class="hidden relative">
-                                <img class="w-full h-16 object-cover rounded bg-gray-700">
-                                <button onclick="event.stopPropagation(); clearFile('cover')" class="absolute -top-1 -right-1 w-5 h-5 bg-red-500 rounded-full text-white text-xs flex items-center justify-center">
-                                    <i class="fas fa-times"></i>
-                                </button>
+                        </div>
+
+                        <!-- 视频上传 -->
+                        <div>
+                            <label class="block text-sm text-gray-400 mb-2">视频文件 <span class="text-red-400">*</span></label>
+                            <div id="videoZone" class="upload-zone rounded-xl p-4 cursor-pointer relative h-32 flex items-center justify-center" onclick="document.getElementById('videoInput').click()">
+                                <input type="file" id="videoInput" accept="video/*" class="hidden" onchange="handleFileSelect('video', this)">
+                                <div id="videoPlaceholder" class="text-center">
+                                    <i class="fas fa-film text-3xl text-gray-500 mb-2"></i>
+                                    <p class="text-sm text-gray-400">点击上传视频</p>
+                                    <p class="text-xs text-gray-600 mt-1">MP4/MOV ≤500MB</p>
+                                </div>
+                                <div id="videoPreview" class="hidden absolute inset-0 p-2 flex flex-col items-center justify-center">
+                                    <i class="fas fa-check-circle text-green-400 text-4xl mb-2"></i>
+                                    <p class="text-sm text-gray-300 truncate max-w-full px-2" id="videoFileName"></p>
+                                    <button onclick="event.stopPropagation(); clearFile('video')" class="mt-2 px-3 py-1 bg-red-500/80 rounded-full text-white text-xs hover:bg-red-500 transition-colors">
+                                        <i class="fas fa-trash-alt mr-1"></i>移除
+                                    </button>
+                                </div>
                             </div>
                         </div>
                     </div>
 
-                    <!-- 视频上传 -->
+                    <!-- 其他信息 -->
+                    <div class="grid grid-cols-3 gap-4">
+                        <div>
+                            <label class="block text-sm text-gray-400 mb-2">分类</label>
+                            <select id="localVideoCategory" class="w-full px-4 py-3 rounded-xl bg-gray-800 border border-gray-700 focus:border-cyan-400 outline-none text-white">
+                                <option value="movie">电影</option>
+                                <option value="tv">电视剧</option>
+                                <option value="variety">综艺</option>
+                                <option value="anime">动漫</option>
+                                <option value="documentary">纪录片</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="block text-sm text-gray-400 mb-2">评分</label>
+                            <input type="number" id="localVideoRating" min="0" max="10" step="0.1" value="8.0" class="w-full px-4 py-3 rounded-xl bg-gray-800 border border-gray-700 focus:border-cyan-400 outline-none text-white">
+                        </div>
+                        <div class="flex items-end pb-3">
+                            <label class="flex items-center gap-3 text-gray-300 cursor-pointer hover:text-white transition-colors">
+                                <input type="checkbox" id="localIsVipVideo" class="w-5 h-5 rounded bg-gray-800 border-gray-700 text-cyan-400 focus:ring-cyan-400"> 
+                                <span class="font-medium">VIP专享</span>
+                            </label>
+                        </div>
+                    </div>
+
+                    <!-- 简介 -->
                     <div>
-                        <label class="block text-xs text-gray-400 mb-1">视频 <span class="text-red-400">*</span></label>
-                        <div id="videoZone" class="upload-zone rounded-lg p-2 cursor-pointer relative" onclick="document.getElementById('videoInput').click()">
-                            <input type="file" id="videoInput" accept="video/mp4,video/webm,video/quicktime" class="hidden" onchange="handleFileSelect('video', this)">
-                            <div id="videoPlaceholder" class="text-center py-3">
-                                <i class="fas fa-film text-xl text-gray-500 mb-1"></i>
-                                <p class="text-xs text-gray-400">点击上传</p>
-                                <p class="text-[10px] text-gray-600">MP4 ≤500M</p>
-                            </div>
-                            <div id="videoPreview" class="hidden relative text-center">
-                                <i class="fas fa-check-circle text-green-400 text-2xl"></i>
-                                <p class="text-[10px] text-gray-400 mt-1 truncate px-1" id="videoFileName"></p>
-                                <button onclick="event.stopPropagation(); clearFile('video')" class="absolute -top-1 -right-1 w-5 h-5 bg-red-500 rounded-full text-white text-xs flex items-center justify-center">
-                                    <i class="fas fa-times"></i>
-                                </button>
+                        <label class="block text-sm text-gray-400 mb-2">视频简介</label>
+                        <textarea id="localVideoDesc" rows="3" class="w-full px-4 py-3 rounded-xl bg-gray-800 border border-gray-700 focus:border-cyan-400 outline-none text-white resize-none" placeholder="请输入视频简介（可选）..."></textarea>
+                    </div>
+
+                    <!-- 按钮 -->
+                    <div class="flex gap-3 pt-2">
+                        <button type="button" onclick="closeVideoModal()" class="flex-1 py-3 bg-gray-700 rounded-xl hover:bg-gray-600 transition-colors font-medium">取消</button>
+                        <button type="button" onclick="uploadLocalVideo()" id="localUploadBtn" disabled class="flex-1 py-3 bg-cyan-400 text-black font-bold rounded-xl hover:opacity-90 transition-opacity disabled:opacity-50 disabled:cursor-not-allowed">
+                            <i class="fas fa-cloud-upload-alt mr-2"></i>开始上传
+                        </button>
+                    </div>
+                </div>
+
+                <!-- URL导入模式 -->
+                <div id="urlUploadPanel" class="hidden space-y-4">
+                    <!-- 标题 -->
+                    <div>
+                        <label class="block text-sm text-gray-400 mb-2">视频标题 <span class="text-red-400">*</span></label>
+                        <input type="text" id="urlVideoTitle" class="w-full px-4 py-3 rounded-xl bg-gray-800 border border-gray-700 focus:border-cyan-400 outline-none text-white transition-colors" placeholder="请输入视频标题">
+                    </div>
+
+                    <!-- 封面URL -->
+                    <div>
+                        <label class="block text-sm text-gray-400 mb-2">封面图片URL <span class="text-red-400">*</span></label>
+                        <div class="flex gap-2">
+                            <input type="url" id="urlCoverInput" class="flex-1 px-4 py-3 rounded-xl bg-gray-800 border border-gray-700 focus:border-cyan-400 outline-none text-white url-input transition-all" placeholder="https://example.com/cover.jpg" oninput="previewUrlCover()">
+                            <button onclick="previewUrlCover()" class="px-4 py-3 bg-gray-700 rounded-xl hover:bg-gray-600 transition-colors">
+                                <i class="fas fa-eye"></i>
+                            </button>
+                        </div>
+                        <!-- 封面预览 -->
+                        <div id="urlCoverPreview" class="hidden mt-3 rounded-xl overflow-hidden bg-gray-800 h-40 relative">
+                            <img id="urlCoverImg" class="w-full h-full object-cover" onerror="this.src='https://via.placeholder.com/640x360?text=Invalid+Image'">
+                            <div class="absolute inset-0 flex items-center justify-center bg-black/50 hidden" id="urlCoverLoading">
+                                <i class="fas fa-spinner fa-spin text-2xl text-cyan-400"></i>
                             </div>
                         </div>
                     </div>
-                </div>
 
-                <!-- 视频预览 - 缩小 -->
-                <div id="playerContainer" class="hidden">
-                    <label class="block text-xs text-gray-400 mb-1">预览</label>
-                    <div id="dplayer" class="rounded-lg overflow-hidden" style="height: 140px;"></div>
-                </div>
-
-                <!-- 其他信息 - 单行 -->
-                <div class="grid grid-cols-3 gap-2">
+                    <!-- 视频URL -->
                     <div>
-                        <label class="block text-xs text-gray-400 mb-1">分类</label>
-                        <select id="videoCategory" class="w-full px-2 py-1.5 rounded-lg bg-gray-800 border border-gray-700 focus:border-cyan-400 outline-none text-white text-xs">
-                            <option value="movie">电影</option>
-                            <option value="tv">电视剧</option>
-                            <option value="variety">综艺</option>
-                            <option value="anime">动漫</option>
-                            <option value="documentary">纪录片</option>
-                        </select>
+                        <label class="block text-sm text-gray-400 mb-2">视频链接URL <span class="text-red-400">*</span></label>
+                        <div class="flex gap-2">
+                            <input type="url" id="urlVideoInput" class="flex-1 px-4 py-3 rounded-xl bg-gray-800 border border-gray-700 focus:border-cyan-400 outline-none text-white url-input transition-all" placeholder="https://example.com/video.mp4 或 .m3u8">
+                            <button onclick="testVideoUrl()" class="px-4 py-3 bg-gray-700 rounded-xl hover:bg-gray-600 transition-colors whitespace-nowrap">
+                                <i class="fas fa-play mr-1"></i>测试
+                            </button>
+                        </div>
+                        <p class="text-xs text-gray-500 mt-2">
+                            <i class="fas fa-info-circle mr-1"></i>
+                            支持格式: MP4、WebM、HLS(m3u8)
+                        </p>
                     </div>
+
+                    <!-- 视频预览播放器 -->
+                    <div id="urlPlayerContainer" class="hidden">
+                        <label class="block text-sm text-gray-400 mb-2">视频预览</label>
+                        <div id="urlPreviewPlayer" class="w-full aspect-video"></div>
+                    </div>
+
+                    <!-- 其他信息 -->
+                    <div class="grid grid-cols-3 gap-4">
+                        <div>
+                            <label class="block text-sm text-gray-400 mb-2">分类</label>
+                            <select id="urlVideoCategory" class="w-full px-4 py-3 rounded-xl bg-gray-800 border border-gray-700 focus:border-cyan-400 outline-none text-white">
+                                <option value="movie">电影</option>
+                                <option value="tv">电视剧</option>
+                                <option value="variety">综艺</option>
+                                <option value="anime">动漫</option>
+                                <option value="documentary">纪录片</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="block text-sm text-gray-400 mb-2">评分</label>
+                            <input type="number" id="urlVideoRating" min="0" max="10" step="0.1" value="8.0" class="w-full px-4 py-3 rounded-xl bg-gray-800 border border-gray-700 focus:border-cyan-400 outline-none text-white">
+                        </div>
+                        <div class="flex items-end pb-3">
+                            <label class="flex items-center gap-3 text-gray-300 cursor-pointer hover:text-white transition-colors">
+                                <input type="checkbox" id="urlIsVipVideo" class="w-5 h-5 rounded bg-gray-800 border-gray-700 text-cyan-400 focus:ring-cyan-400"> 
+                                <span class="font-medium">VIP专享</span>
+                            </label>
+                        </div>
+                    </div>
+
+                    <!-- 简介 -->
                     <div>
-                        <label class="block text-xs text-gray-400 mb-1">评分</label>
-                        <input type="number" id="videoRating" min="0" max="10" step="0.1" value="8.0" class="w-full px-2 py-1.5 rounded-lg bg-gray-800 border border-gray-700 focus:border-cyan-400 outline-none text-white text-xs">
+                        <label class="block text-sm text-gray-400 mb-2">视频简介</label>
+                        <textarea id="urlVideoDesc" rows="3" class="w-full px-4 py-3 rounded-xl bg-gray-800 border border-gray-700 focus:border-cyan-400 outline-none text-white resize-none" placeholder="请输入视频简介（可选）..."></textarea>
                     </div>
-                    <div class="flex items-end">
-                        <label class="flex items-center gap-2 text-xs text-gray-300 cursor-pointer pb-2">
-                            <input type="checkbox" id="isVipVideo" class="w-4 h-4 rounded bg-gray-800 border-gray-700 text-cyan-400"> 
-                            <span>VIP专享</span>
-                        </label>
+
+                    <!-- 按钮 -->
+                    <div class="flex gap-3 pt-2">
+                        <button type="button" onclick="closeVideoModal()" class="flex-1 py-3 bg-gray-700 rounded-xl hover:bg-gray-600 transition-colors font-medium">取消</button>
+                        <button type="button" onclick="saveUrlVideo()" id="urlSaveBtn" disabled class="flex-1 py-3 bg-gradient-to-r from-cyan-400 to-purple-500 text-black font-bold rounded-xl hover:opacity-90 transition-opacity disabled:opacity-50 disabled:cursor-not-allowed">
+                            <i class="fas fa-save mr-2"></i>保存到库
+                        </button>
                     </div>
-                </div>
-
-                <div>
-                    <label class="block text-xs text-gray-400 mb-1">简介</label>
-                    <textarea id="videoDesc" rows="2" class="w-full px-3 py-2 rounded-lg bg-gray-800 border border-gray-700 focus:border-cyan-400 outline-none text-white text-xs resize-none" placeholder="视频简介..."></textarea>
-                </div>
-
-                <!-- 按钮 -->
-                <div class="flex gap-2 pt-1">
-                    <button type="button" onclick="closeVideoModal()" class="flex-1 py-2 bg-gray-700 rounded-lg hover:bg-gray-600 transition-colors text-sm">取消</button>
-                    <button type="button" onclick="uploadVideo()" id="uploadBtn" disabled class="flex-1 py-2 bg-cyan-400 text-black font-bold rounded-lg hover:opacity-90 transition-opacity disabled:opacity-50 disabled:cursor-not-allowed text-sm">
-                        <i class="fas fa-cloud-upload-alt mr-1"></i>上传
-                    </button>
                 </div>
             </div>
         </div>
@@ -351,7 +451,8 @@
         
         let videos = safeGet('gdx_videos', []);
         let selectedFiles = { cover: null, video: null };
-        let dp = null, previewDp = null;
+        let dp = null, previewDp = null, urlDp = null;
+        let currentUploadMode = 'local';
 
         // ========== 登录 ==========
         if (localStorage.getItem('gdx_admin_logged_in') === 'true') showDashboard();
@@ -479,16 +580,19 @@
             
             const tbody = document.getElementById('videoTableBody');
             if (videos.length === 0) {
-                tbody.innerHTML = '<tr><td colspan="5" class="px-6 py-8 text-center text-gray-500">暂无视频，点击右上角上传</td></tr>';
+                tbody.innerHTML = '<tr><td colspan="5" class="px-6 py-8 text-center text-gray-500">暂无视频，点击右上角添加</td></tr>';
                 return;
             }
             
-            const catMap = { movie: '电影', tv: '电视剧', variety: '综艺', anime: '动漫', documentary: '纪录片' };
             tbody.innerHTML = videos.map(v => `
                 <tr class="hover:bg-gray-800/30">
                     <td class="px-6 py-4"><img src="${v.coverUrl}" class="w-16 h-10 object-cover rounded-lg bg-gray-700" onerror="this.src='https://via.placeholder.com/160x90?text=No+Cover'"></td>
                     <td class="px-6 py-4 font-medium">${v.title}</td>
-                    <td class="px-6 py-4 text-gray-400">${formatSize(v.fileSize)}</td>
+                    <td class="px-6 py-4">
+                        ${v.sourceType === 'url' 
+                            ? '<span class="px-2 py-1 rounded-full text-xs bg-blue-500/20 text-blue-400"><i class="fas fa-link mr-1"></i>链接</span>' 
+                            : '<span class="px-2 py-1 rounded-full text-xs bg-green-500/20 text-green-400"><i class="fas fa-server mr-1"></i>本地</span>'}
+                    </td>
                     <td class="px-6 py-4">${v.isVip ? '<span class="px-2 py-1 rounded-full text-xs font-bold bg-amber-500/20 text-amber-400">VIP</span>' : '<span class="px-2 py-1 rounded-full text-xs bg-gray-700 text-gray-400">免费</span>'}</td>
                     <td class="px-6 py-4 text-right">
                         <button onclick="playVideo(${v.id})" class="text-green-400 hover:text-green-300 mr-3"><i class="fas fa-play-circle"></i></button>
@@ -505,25 +609,55 @@
             return (b / Math.pow(1024, i)).toFixed(1) + ' ' + u[i];
         }
 
-        // ========== 视频上传 ==========
+        // ========== 上传模式切换 ==========
+        function switchUploadMode(mode) {
+            currentUploadMode = mode;
+            
+            const tabLocal = document.getElementById('tabLocal');
+            const tabUrl = document.getElementById('tabUrl');
+            const localPanel = document.getElementById('localUploadPanel');
+            const urlPanel = document.getElementById('urlUploadPanel');
+            
+            if (mode === 'local') {
+                tabLocal.className = 'flex-1 py-2 px-4 rounded-lg font-medium transition-all tab-active';
+                tabUrl.className = 'flex-1 py-2 px-4 rounded-lg font-medium transition-all tab-inactive';
+                localPanel.classList.remove('hidden');
+                urlPanel.classList.add('hidden');
+                // 销毁URL播放器
+                if (urlDp) {
+                    urlDp.destroy();
+                    urlDp = null;
+                }
+            } else {
+                tabLocal.className = 'flex-1 py-2 px-4 rounded-lg font-medium transition-all tab-inactive';
+                tabUrl.className = 'flex-1 py-2 px-4 rounded-lg font-medium transition-all tab-active';
+                localPanel.classList.add('hidden');
+                urlPanel.classList.remove('hidden');
+            }
+        }
+
+        // ========== 本地上传逻辑 ==========
         function openVideoModal() {
             document.getElementById('videoModal').style.display = 'flex';
             resetUploadForm();
-            setupDragDrop();
+            switchUploadMode('local');
         }
 
         function closeVideoModal() {
             document.getElementById('videoModal').style.display = 'none';
             if (dp) { dp.destroy(); dp = null; }
+            if (urlDp) { urlDp.destroy(); urlDp = null; }
         }
 
         function resetUploadForm() {
             selectedFiles = { cover: null, video: null };
-            document.getElementById('videoTitle').value = '';
-            document.getElementById('videoCategory').value = 'movie';
-            document.getElementById('videoRating').value = '8.0';
-            document.getElementById('videoDesc').value = '';
-            document.getElementById('isVipVideo').checked = false;
+            
+            // 重置本地上传
+            document.getElementById('localVideoTitle').value = '';
+            document.getElementById('localVideoCategory').value = 'movie';
+            document.getElementById('localVideoRating').value = '8.0';
+            document.getElementById('localVideoDesc').value = '';
+            document.getElementById('localIsVipVideo').checked = false;
             
             ['cover', 'video'].forEach(t => {
                 document.getElementById(t + 'Input').value = '';
@@ -532,18 +666,26 @@
                 document.getElementById(t + 'Zone').classList.remove('has-file');
             });
             
-            document.getElementById('playerContainer').classList.add('hidden');
             document.getElementById('uploadProgress').classList.add('hidden');
-            document.getElementById('uploadBtn').disabled = true;
+            document.getElementById('localUploadBtn').disabled = true;
             
-            if (dp) { dp.destroy(); dp = null; }
+            // 重置URL上传
+            document.getElementById('urlVideoTitle').value = '';
+            document.getElementById('urlCoverInput').value = '';
+            document.getElementById('urlVideoInput').value = '';
+            document.getElementById('urlCoverPreview').classList.add('hidden');
+            document.getElementById('urlPlayerContainer').classList.add('hidden');
+            document.getElementById('urlVideoCategory').value = 'movie';
+            document.getElementById('urlVideoRating').value = '8.0';
+            document.getElementById('urlVideoDesc').value = '';
+            document.getElementById('urlIsVipVideo').checked = false;
+            document.getElementById('urlSaveBtn').disabled = true;
         }
 
         function handleFileSelect(type, input) {
             const file = input.files[0];
             if (!file) return;
             
-            // 验证
             if (type === 'cover') {
                 if (!file.type.startsWith('image/')) {
                     alert('请选择图片文件');
@@ -567,25 +709,21 @@
             
             selectedFiles[type] = file;
             
-            // 更新UI
             document.getElementById(type + 'Placeholder').classList.add('hidden');
             document.getElementById(type + 'Preview').classList.remove('hidden');
             document.getElementById(type + 'Zone').classList.add('has-file');
             
             if (type === 'cover') {
-                // 预览封面
                 const reader = new FileReader();
                 reader.onload = (e) => {
                     document.querySelector('#coverPreview img').src = e.target.result;
                 };
                 reader.readAsDataURL(file);
             } else {
-                // 显示视频信息
                 document.getElementById('videoFileName').textContent = file.name;
-                showVideoPreview(file);
             }
             
-            checkCanUpload();
+            checkCanUploadLocal();
         }
 
         function clearFile(type) {
@@ -594,176 +732,194 @@
             document.getElementById(type + 'Placeholder').classList.remove('hidden');
             document.getElementById(type + 'Preview').classList.add('hidden');
             document.getElementById(type + 'Zone').classList.remove('has-file');
-            
-            if (type === 'video') {
-                document.getElementById('playerContainer').classList.add('hidden');
-                if (dp) { dp.destroy(); dp = null; }
-            }
-            
-            checkCanUpload();
+            checkCanUploadLocal();
         }
 
-        function showVideoPreview(file) {
-            const url = URL.createObjectURL(file);
-            document.getElementById('playerContainer').classList.remove('hidden');
-            
-            if (dp) dp.destroy();
-            
-            dp = new DPlayer({
-                container: document.getElementById('dplayer'),
-                video: { url: url, type: 'auto' },
-                autoplay: false,
-                theme: '#00d4ff',
-                lang: 'zh-cn',
-                preload: 'metadata',
-                volume: 0.7
-            });
+        function checkCanUploadLocal() {
+            const can = selectedFiles.cover && selectedFiles.video && document.getElementById('localVideoTitle').value.trim();
+            document.getElementById('localUploadBtn').disabled = !can;
         }
 
-        function checkCanUpload() {
-            const can = selectedFiles.cover && selectedFiles.video && document.getElementById('videoTitle').value.trim();
-            document.getElementById('uploadBtn').disabled = !can;
-        }
+        document.getElementById('localVideoTitle').addEventListener('input', checkCanUploadLocal);
 
-        function setupDragDrop() {
-            ['cover', 'video'].forEach(type => {
-                const zone = document.getElementById(type + 'Zone');
-                
-                zone.addEventListener('dragover', (e) => {
-                    e.preventDefault();
-                    zone.classList.add('dragover');
-                });
-                
-                zone.addEventListener('dragleave', () => {
-                    zone.classList.remove('dragover');
-                });
-                
-                zone.addEventListener('drop', (e) => {
-                    e.preventDefault();
-                    zone.classList.remove('dragover');
-                    
-                    const files = e.dataTransfer.files;
-                    if (files.length > 0) {
-                        const input = document.getElementById(type + 'Input');
-                        input.files = files;
-                        handleFileSelect(type, input);
-                    }
-                });
-            });
-            
-            document.getElementById('videoTitle').addEventListener('input', checkCanUpload);
-        }
-
-        // 【修复】上传函数 - 添加详细错误提示
-        async function uploadVideo() {
-            const title = document.getElementById('videoTitle').value.trim();
+        async function uploadLocalVideo() {
+            const title = document.getElementById('localVideoTitle').value.trim();
             if (!title || !selectedFiles.cover || !selectedFiles.video) {
-                alert('请填写标题并选择文件');
+                alert('请填写完整信息');
                 return;
             }
 
-            // 检查API是否可达
-            console.log('准备上传到:', API_BASE + '/upload');
-            
             document.getElementById('uploadProgress').classList.remove('hidden');
-            document.getElementById('uploadBtn').disabled = true;
-            document.getElementById('uploadStatus').textContent = '连接服务器...';
+            document.getElementById('localUploadBtn').disabled = true;
 
-            try {
-                // 测试服务器连接
-                try {
-                    const testRes = await fetch(API_BASE + '/videos', { method: 'HEAD' });
-                    console.log('服务器连接正常');
-                } catch(e) {
-                    console.warn('服务器连接测试失败:', e);
-                    // 继续尝试上传，可能只是HEAD不支持
+            const formData = new FormData();
+            formData.append('cover', selectedFiles.cover);
+            formData.append('video', selectedFiles.video);
+
+            const xhr = new XMLHttpRequest();
+            
+            xhr.upload.addEventListener('progress', (e) => {
+                if (e.lengthComputable) {
+                    const p = Math.round((e.loaded / e.total) * 100);
+                    document.getElementById('progressBar').style.width = p + '%';
+                    document.getElementById('uploadPercent').textContent = p + '%';
+                    document.getElementById('uploadStatus').textContent = p < 100 ? `上传中 ${p}%` : '处理中...';
                 }
+            });
 
-                const formData = new FormData();
-                formData.append('cover', selectedFiles.cover);
-                formData.append('video', selectedFiles.video);
+            xhr.addEventListener('load', () => {
+                if (xhr.status === 200) {
+                    const result = JSON.parse(xhr.responseText);
+                    
+                    const videoData = {
+                        id: Date.now(),
+                        title: title,
+                        coverUrl: result.cover.url,
+                        videoUrl: result.video.url,
+                        category: document.getElementById('localVideoCategory').value,
+                        rating: parseFloat(document.getElementById('localVideoRating').value) || 8.0,
+                        desc: document.getElementById('localVideoDesc').value.trim(),
+                        isVip: document.getElementById('localIsVipVideo').checked,
+                        fileSize: result.video.size,
+                        sourceType: 'local',
+                        createdAt: new Date().toISOString()
+                    };
 
-                const xhr = new XMLHttpRequest();
-                
-                xhr.upload.addEventListener('progress', (e) => {
-                    if (e.lengthComputable) {
-                        const p = Math.round((e.loaded / e.total) * 100);
-                        document.getElementById('progressBar').style.width = p + '%';
-                        document.getElementById('uploadPercent').textContent = p + '%';
-                        document.getElementById('uploadStatus').textContent = p < 100 ? `上传中 ${p}%` : '处理中...';
+                    videos.push(videoData);
+                    
+                    if (safeSet('gdx_videos', videos)) {
+                        window.dispatchEvent(new StorageEvent('storage', {
+                            key: 'gdx_videos',
+                            newValue: JSON.stringify(videos)
+                        }));
+                        
+                        closeVideoModal();
+                        renderVideos();
+                        showToast('上传成功');
                     }
-                });
-
-                xhr.addEventListener('error', () => {
-                    throw new Error('网络请求失败，请检查：\n1. 服务器是否启动 (pm2 status)\n2. 防火墙是否放行3000端口\n3. API地址是否正确');
-                });
-
-                xhr.addEventListener('timeout', () => {
-                    throw new Error('上传超时，文件可能太大');
-                });
-
-                const result = await new Promise((resolve, reject) => {
-                    xhr.addEventListener('load', () => {
-                        console.log('服务器响应:', xhr.status, xhr.responseText);
-                        if (xhr.status === 200) {
-                            try {
-                                resolve(JSON.parse(xhr.responseText));
-                            } catch(e) {
-                                reject(new Error('服务器返回数据格式错误'));
-                            }
-                        } else {
-                            let msg = '上传失败 (HTTP ' + xhr.status + ')';
-                            try {
-                                const err = JSON.parse(xhr.responseText);
-                                msg = err.error || msg;
-                            } catch(e) {}
-                            reject(new Error(msg));
-                        }
-                    });
-                    
-                    xhr.open('POST', API_BASE + '/upload');
-                    xhr.timeout = 300000; // 5分钟超时
-                    xhr.send(formData);
-                });
-
-                console.log('上传成功:', result);
-
-                // 保存元数据
-                const videoData = {
-                    id: Date.now(),
-                    title: title,
-                    coverUrl: result.cover.url,
-                    videoUrl: result.video.url,
-                    category: document.getElementById('videoCategory').value,
-                    rating: parseFloat(document.getElementById('videoRating').value) || 8.0,
-                    desc: document.getElementById('videoDesc').value.trim(),
-                    isVip: document.getElementById('isVipVideo').checked,
-                    fileSize: result.video.size,
-                    createdAt: new Date().toISOString()
-                };
-
-                videos.push(videoData);
-                
-                if (safeSet('gdx_videos', videos)) {
-                    window.dispatchEvent(new StorageEvent('storage', {
-                        key: 'gdx_videos',
-                        newValue: JSON.stringify(videos)
-                    }));
-                    
-                    closeVideoModal();
-                    renderVideos();
-                    showToast('上传成功');
+                } else {
+                    alert('上传失败');
+                    document.getElementById('localUploadBtn').disabled = false;
                 }
+            });
 
-            } catch (err) {
-                console.error('上传错误:', err);
-                alert('上传失败：' + err.message);
+            xhr.addEventListener('error', () => {
+                alert('网络错误');
+                document.getElementById('localUploadBtn').disabled = false;
+            });
+
+            xhr.open('POST', API_BASE + '/upload');
+            xhr.send(formData);
+        }
+
+        // ========== URL上传逻辑 ==========
+        function previewUrlCover() {
+            const url = document.getElementById('urlCoverInput').value.trim();
+            const preview = document.getElementById('urlCoverPreview');
+            const img = document.getElementById('urlCoverImg');
+            const loading = document.getElementById('urlCoverLoading');
+            
+            if (!url) {
+                preview.classList.add('hidden');
+                return;
+            }
+            
+            preview.classList.remove('hidden');
+            loading.classList.remove('hidden');
+            
+            img.onload = () => {
+                loading.classList.add('hidden');
+            };
+            
+            img.onerror = () => {
+                loading.classList.add('hidden');
+            };
+            
+            img.src = url;
+            checkCanSaveUrl();
+        }
+
+        function testVideoUrl() {
+            const url = document.getElementById('urlVideoInput').value.trim();
+            if (!url) {
+                alert('请输入视频链接');
+                return;
+            }
+            
+            document.getElementById('urlPlayerContainer').classList.remove('hidden');
+            
+            if (urlDp) {
+                urlDp.destroy();
+            }
+            
+            const isHLS = url.endsWith('.m3u8') || url.includes('.m3u8');
+            
+            urlDp = new DPlayer({
+                container: document.getElementById('urlPreviewPlayer'),
+                video: {
+                    url: url,
+                    type: isHLS ? 'hls' : 'auto'
+                },
+                autoplay: false,
+                theme: '#00d4ff',
+                lang: 'zh-cn'
+            });
+            
+            checkCanSaveUrl();
+        }
+
+        function checkCanSaveUrl() {
+            const title = document.getElementById('urlVideoTitle').value.trim();
+            const coverUrl = document.getElementById('urlCoverInput').value.trim();
+            const videoUrl = document.getElementById('urlVideoInput').value.trim();
+            
+            const can = title && coverUrl && videoUrl;
+            document.getElementById('urlSaveBtn').disabled = !can;
+        }
+
+        ['urlVideoTitle', 'urlCoverInput', 'urlVideoInput'].forEach(id => {
+            document.getElementById(id).addEventListener('input', checkCanSaveUrl);
+        });
+
+        function saveUrlVideo() {
+            const title = document.getElementById('urlVideoTitle').value.trim();
+            const coverUrl = document.getElementById('urlCoverInput').value.trim();
+            const videoUrl = document.getElementById('urlVideoInput').value.trim();
+            
+            if (!title || !coverUrl || !videoUrl) {
+                alert('请填写完整信息');
+                return;
+            }
+
+            const videoData = {
+                id: Date.now(),
+                title: title,
+                coverUrl: coverUrl,
+                videoUrl: videoUrl,
+                category: document.getElementById('urlVideoCategory').value,
+                rating: parseFloat(document.getElementById('urlVideoRating').value) || 8.0,
+                desc: document.getElementById('urlVideoDesc').value.trim(),
+                isVip: document.getElementById('urlIsVipVideo').checked,
+                fileSize: 0,
+                sourceType: 'url',
+                createdAt: new Date().toISOString()
+            };
+
+            videos.push(videoData);
+            
+            if (safeSet('gdx_videos', videos)) {
+                window.dispatchEvent(new StorageEvent('storage', {
+                    key: 'gdx_videos',
+                    newValue: JSON.stringify(videos)
+                }));
                 
-                document.getElementById('uploadProgress').classList.add('hidden');
-                document.getElementById('uploadBtn').disabled = false;
+                closeVideoModal();
+                renderVideos();
+                showToast('保存成功');
             }
         }
 
+        // ========== 通用功能 ==========
         function showToast(msg) {
             const t = document.createElement('div');
             t.className = 'fixed top-20 left-1/2 transform -translate-x-1/2 bg-green-500 text-white px-6 py-3 rounded-full shadow-lg z-[100] text-sm';
@@ -790,9 +946,15 @@
             
             if (previewDp) previewDp.destroy();
             
+            const isHLS = v.videoUrl.endsWith('.m3u8') || v.videoUrl.includes('.m3u8');
+            
             previewDp = new DPlayer({
                 container: document.getElementById('previewPlayer'),
-                video: { url: v.videoUrl, type: 'auto', pic: v.coverUrl },
+                video: { 
+                    url: v.videoUrl, 
+                    type: isHLS ? 'hls' : 'auto', 
+                    pic: v.coverUrl 
+                },
                 autoplay: true,
                 theme: '#00d4ff',
                 lang: 'zh-cn',
