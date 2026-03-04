@@ -3,16 +3,16 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>GDX Video - 海量高清视频</title>
+    <title>GDX - 下一代视频娱乐平台</title>
     <script src="https://cdn.tailwindcss.com"></script>
-    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@300;400;500;700;900&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Noto+Sans+SC:wght@300;400;500;700;900&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link rel="stylesheet" href="https://unpkg.com/dplayer@1.27.1/dist/DPlayer.min.css">
     <script src="https://unpkg.com/hls.js@1.4.12/dist/hls.min.js"></script>
     <script src="https://unpkg.com/dplayer@1.27.1/dist/DPlayer.min.js"></script>
     <style>
         * { 
-            font-family: 'Noto Sans SC', sans-serif; 
+            font-family: 'Inter', 'Noto Sans SC', sans-serif; 
             -webkit-tap-highlight-color: transparent;
             box-sizing: border-box;
         }
@@ -20,1184 +20,999 @@
         .no-scrollbar::-webkit-scrollbar { display: none; }
         .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
         
-        .gradient-text { 
-            background: linear-gradient(135deg, #00d4ff 0%, #7b2cbf 100%); 
-            -webkit-background-clip: text; 
-            -webkit-text-fill-color: transparent; 
+        /* ==================== 主题变量 ==================== */
+        :root {
+            --primary: #00be06;
+            --secondary: #7b2cbf;
+            --accent: #ff006e;
+            --dark: #0a0a0f;
+            --surface: #12121a;
+            --elevated: #1a1a25;
+            --border: rgba(255,255,255,0.08);
+            --text-primary: #ffffff;
+            --text-secondary: #9ca3af;
+            --indicator-active: #00be06;
+            --indicator-inactive: #6b7280;
         }
         
-        .glass { 
-            background: rgba(30, 41, 59, 0.7); 
-            backdrop-filter: blur(20px); 
-            -webkit-backdrop-filter: blur(20px); 
-            border: 1px solid rgba(255, 255, 255, 0.1); 
+        [data-theme="light"] {
+            --primary: #00be06;
+            --secondary: #00a806;
+            --accent: #FFD700;
+            --dark: #f3f4f6;
+            --surface: #ffffff;
+            --elevated: #f9fafb;
+            --border: #e5e7eb;
+            --text-primary: #111827;
+            --text-secondary: #6b7280;
         }
         
-        .video-card { 
-            transition: all 0.3s ease; 
-            cursor: pointer; 
-        }
-        .video-card:hover { 
-            transform: translateY(-4px); 
-            box-shadow: 0 10px 30px rgba(0, 212, 255, 0.2); 
-        }
-        .video-card:active { 
-            transform: scale(0.95); 
-        }
-        
-        @keyframes vip-shine { 
-            0% { background-position: -200% center; } 
-            100% { background-position: 200% center; } 
+        [data-theme="pink"] {
+            --primary: #ec4899;
+            --secondary: #db2777;
+            --accent: #f472b6;
+            --dark: #fdf2f8;
+            --surface: #ffffff;
+            --elevated: #fce7f3;
+            --border: #fbcfe8;
+            --text-primary: #831843;
+            --text-secondary: #be185d;
         }
         
-        .vip-badge { 
-            background: linear-gradient(90deg, #fbbf24, #f59e0b, #fbbf24); 
-            background-size: 200% auto; 
-            animation: vip-shine 3s linear infinite; 
+        body {
+            background: var(--dark);
+            color: var(--text-primary);
+            transition: background-color 0.3s, color 0.3s;
         }
         
-        .page { 
-            display: none; 
-            opacity: 0; 
-            transition: opacity 0.3s ease; 
-        }
-        .page.active { 
-            display: block; 
-            opacity: 1; 
-        }
-        
-        #toast { 
-            position: fixed; 
-            top: 80px; 
-            left: 50%; 
-            transform: translateX(-50%) translateY(-100px); 
-            opacity: 0; 
-            transition: all 0.3s ease; 
-            z-index: 10000; 
-        }
-        #toast.show { 
-            transform: translateX(-50%) translateY(0); 
-            opacity: 1; 
-        }
-        
-        .nav-item { 
-            transition: all 0.3s ease; 
-        }
-        .nav-item:hover { 
-            transform: translateY(-2px); 
-        }
-
-        /* ========== 播放器样式 - 优化版 ========== */
-        #videoPlayerModal {
+        /* ==================== 左侧 Dock 栏（120px） ==================== */
+        .side-dock {
             position: fixed;
-            top: 0;
             left: 0;
-            right: 0;
+            top: 0;
             bottom: 0;
-            z-index: 9999;
-            background: #000;
-            display: none;
-        }
-
-        #videoPlayerModal.active {
+            width: 120px;
+            background: var(--surface);
+            border-right: 1px solid var(--border);
+            z-index: 100;
             display: flex;
             flex-direction: column;
+            transition: all 0.3s;
         }
-
-        /* 播放器头部 */
-        .player-header {
+        
+        /* 顶部横向导航 - GDX + 导航项 */
+        .dock-top {
+            height: 56px;
+            border-bottom: 1px solid var(--border);
+            display: flex;
+            flex-direction: row;
+            align-items: center;
+            padding: 0 12px;
+            gap: 16px;
+        }
+        
+        .dock-logo {
+            font-size: 18px;
+            font-weight: 900;
+            color: var(--primary);
+            margin-right: 8px;
+        }
+        
+        .dock-top-item {
+            display: flex;
+            flex-direction: row;
+            align-items: center;
+            gap: 6px;
+            color: var(--text-secondary);
+            font-size: 14px;
+            cursor: pointer;
+            transition: all 0.2s;
+            padding: 4px 8px;
+            border-radius: 6px;
+        }
+        
+        .dock-top-item:hover, .dock-top-item.active {
+            color: var(--primary);
+            background: rgba(0,190,6,0.1);
+        }
+        
+        .dock-top-item i {
+            font-size: 14px;
+        }
+        
+        /* 中部垂直分类 */
+        .dock-categories {
+            flex: 1;
+            padding: 16px 12px;
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+            overflow-y: auto;
+        }
+        
+        .dock-cat-item {
+            padding: 12px 16px;
+            border-radius: 12px;
+            color: var(--text-secondary);
+            font-size: 14px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.2s;
+            position: relative;
+        }
+        
+        .dock-cat-item:hover {
+            color: var(--text-primary);
+            background: rgba(255,255,255,0.05);
+        }
+        
+        .dock-cat-item.active {
+            color: var(--primary);
+            background: rgba(0,190,6,0.1);
+        }
+        
+        .dock-cat-item.active::before {
+            content: '';
             position: absolute;
-            top: 0;
             left: 0;
+            top: 50%;
+            transform: translateY(-50%);
+            width: 3px;
+            height: 20px;
+            background: var(--primary);
+            border-radius: 0 3px 3px 0;
+        }
+        
+        /* 底部主题切换 - 竖向圆形按钮 */
+        .dock-bottom {
+            padding: 16px;
+            border-top: 1px solid var(--border);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 12px;
+        }
+        
+        .theme-btn {
+            width: 32px;
+            height: 32px;
+            border-radius: 50%;
+            border: 2px solid var(--border);
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        
+        .theme-btn:hover {
+            transform: scale(1.1);
+        }
+        
+        .theme-btn.active {
+            border-color: var(--primary);
+            box-shadow: 0 0 0 2px var(--primary);
+        }
+        
+        /* ==================== 主内容区 ==================== */
+        .main-content {
+            margin-left: 120px;
+            min-height: 100vh;
+        }
+        
+        /* 顶部固定栏 - 修复：使用CSS变量支持主题切换 */
+        .top-bar {
+            position: fixed;
+            top: 0;
+            left: 120px;
             right: 0;
-            height: 50px;
-            background: linear-gradient(to bottom, rgba(0,0,0,0.8), transparent);
-            z-index: 100;
+            height: 56px;
+            background: var(--surface);
+            backdrop-filter: blur(20px);
+            border-bottom: 1px solid var(--border);
+            z-index: 90;
             display: flex;
             align-items: center;
             justify-content: space-between;
-            padding: 0 10px;
-            pointer-events: none;
+            padding: 0 24px;
+            transition: background-color 0.3s, border-color 0.3s;
         }
-
-        .player-header > * {
-            pointer-events: auto;
+        
+        /* ==================== 正在热播 - 横向大卡片轮播 ==================== */
+        .hero-section {
+            padding: 80px 24px 24px;
         }
-
-        /* 播放器主体区域 */
-        .player-body {
-            flex: 1;
+        
+        .section-title {
+            font-size: 24px;
+            font-weight: 800;
+            margin-bottom: 20px;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+        
+        .section-title i {
+            color: var(--primary);
+        }
+        
+        .hot-scroll {
+            display: flex;
+            gap: 24px;
+            overflow-x: auto;
+            padding-bottom: 20px;
+            scroll-snap-type: x mandatory;
+            scroll-behavior: smooth;
+        }
+        
+        .hot-card {
+            flex-shrink: 0;
+            width: 640px;
+            height: 360px;
+            border-radius: 16px;
+            overflow: hidden;
             position: relative;
+            cursor: pointer;
+            transition: all 0.3s;
+            scroll-snap-align: start;
+        }
+        
+        .hot-card:hover {
+            transform: scale(1.02);
+            box-shadow: 0 25px 50px rgba(0,0,0,0.5);
+        }
+        
+        .hot-card img {
             width: 100%;
             height: 100%;
+            object-fit: cover;
         }
-
-        /* DPlayer 容器 */
-        #dplayerContainer {
+        
+        .hot-card .overlay {
             position: absolute;
-            top: 0;
-            left: 0;
-            right: 0;
-            bottom: 0;
+            inset: 0;
+            background: linear-gradient(to top, rgba(0,0,0,0.9) 0%, transparent 60%);
+            display: flex;
+            flex-direction: column;
+            justify-content: flex-end;
+            padding: 24px;
+        }
+        
+        .hot-card .play-btn {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%) scale(0.8);
+            width: 80px;
+            height: 80px;
+            border-radius: 50%;
+            background: rgba(0,190,6,0.9);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            opacity: 0;
+            transition: all 0.3s;
+        }
+        
+        .hot-card:hover .play-btn {
+            opacity: 1;
+            transform: translate(-50%, -50%) scale(1);
+        }
+        
+        .hot-card .title {
+            font-size: 28px;
+            font-weight: 700;
+            margin-bottom: 8px;
+        }
+        
+        .hot-card .meta {
+            display: flex;
+            align-items: center;
+            gap: 16px;
+            color: rgba(255,255,255,0.7);
+            font-size: 14px;
+        }
+        
+        /* 轮播指示器 */
+        .carousel-indicators {
+            display: flex;
+            justify-content: center;
+            gap: 8px;
+            margin-top: 16px;
+        }
+        
+        .carousel-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: var(--indicator-inactive);
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+        
+        .carousel-dot.active {
+            background: var(--indicator-active);
+            width: 24px;
+            border-radius: 4px;
+        }
+        
+        /* ==================== 分类区块 - 4列小网格 ==================== */
+        .category-section {
+            padding: 24px;
+            scroll-margin-top: 80px;
+        }
+        
+        .video-grid {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 16px;
+        }
+        
+        .video-card {
+            border-radius: 12px;
+            overflow: hidden;
+            background: var(--elevated);
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+        
+        .video-card:hover {
+            transform: translateY(-4px);
+            box-shadow: 0 12px 24px rgba(0,0,0,0.3);
+        }
+        
+        .video-card .thumb {
+            aspect-ratio: 16/9;
+            position: relative;
+            overflow: hidden;
+        }
+        
+        .video-card .thumb img {
             width: 100%;
             height: 100%;
-        }
-
-        /* 强制 DPlayer 全高显示 */
-        #dplayerContainer .dplayer {
-            width: 100% !important;
-            height: 100% !important;
-            position: relative !important;
-        }
-
-        /* 视频区域 */
-        #dplayerContainer .dplayer-video-wrap {
-            position: absolute !important;
-            top: 0 !important;
-            left: 0 !important;
-            right: 0 !important;
-            bottom: 40px !important;
-            width: 100% !important;
-            height: calc(100% - 40px) !important;
-        }
-
-        /* 控制栏 - 固定在底部 */
-        #dplayerContainer .dplayer-controller {
-            position: absolute !important;
-            bottom: 0 !important;
-            left: 0 !important;
-            right: 0 !important;
-            height: 40px !important;
-            padding: 0 10px !important;
-            background: rgba(0, 0, 0, 0.8) !important;
-            display: flex !important;
-            align-items: center !important;
-            z-index: 101 !important;
-        }
-
-        /* ========== 进度条美化 ========== */
-        #dplayerContainer .dplayer-bar-wrap {
-            flex: 1 !important;
-            margin: 0 10px !important;
-            height: 4px !important;
-            background: rgba(255,255,255,0.2) !important; /* 未播放部分 - 灰色 */
-            border-radius: 2px !important;
-            cursor: pointer !important;
-            position: relative !important;
-        }
-
-        #dplayerContainer .dplayer-bar {
-            height: 100% !important;
-            background: #00d4ff !important; /* 已播放部分 - 主题色 */
-            border-radius: 2px !important;
-            position: relative !important;
-        }
-
-        #dplayerContainer .dplayer-thumb {
-            width: 12px !important;
-            height: 12px !important;
-            background: #00d4ff !important;
-            border-radius: 50% !important;
-            position: absolute !important;
-            right: -6px !important;
-            top: 50% !important;
-            transform: translateY(-50%) !important;
-            box-shadow: 0 0 10px rgba(0, 212, 255, 0.5) !important;
-            transition: transform 0.2s !important;
-        }
-
-        #dplayerContainer .dplayer-bar-wrap:hover .dplayer-thumb {
-            transform: translateY(-50%) scale(1.2) !important;
-        }
-
-        /* 缓冲条颜色 */
-        #dplayerContainer .dplayer-loaded {
-            background: rgba(255,255,255,0.1) !important;
-            border-radius: 2px !important;
-        }
-
-        /* 按钮样式 */
-        #dplayerContainer .dplayer-icons {
-            display: flex !important;
-            align-items: center !important;
-            gap: 12px !important;
-        }
-
-        #dplayerContainer .dplayer-icon {
-            width: 32px !important;
-            height: 32px !important;
-            display: flex !important;
-            align-items: center !important;
-            justify-content: center !important;
-            cursor: pointer !important;
-            color: #fff !important;
-            opacity: 0.9 !important;
-            transition: opacity 0.2s !important;
-        }
-
-        #dplayerContainer .dplayer-icon:hover {
-            opacity: 1 !important;
-            color: #00d4ff !important;
-        }
-
-        /* ========== 音量按钮修复 ========== */
-        #dplayerContainer .dplayer-volume {
-            position: relative !important;
-            display: flex !important;
-            align-items: center !important;
-            cursor: pointer !important;
-        }
-
-        #dplayerContainer .dplayer-volume-bar-wrap {
-            width: 0 !important;
-            height: 30px !important;
-            overflow: hidden !important;
-            transition: width 0.3s ease !important;
-            display: flex !important;
-            align-items: center !important;
-        }
-
-        #dplayerContainer .dplayer-volume:hover .dplayer-volume-bar-wrap,
-        #dplayerContainer .dplayer-volume.dplayer-volume-active .dplayer-volume-bar-wrap {
-            width: 60px !important;
-            margin-left: 8px !important;
-        }
-
-        #dplayerContainer .dplayer-volume-bar {
-            width: 60px !important;
-            height: 4px !important;
-            background: rgba(255,255,255,0.2) !important;
-            border-radius: 2px !important;
-            position: relative !important;
-            cursor: pointer !important;
-        }
-
-        #dplayerContainer .dplayer-volume-bar-inner {
-            height: 100% !important;
-            background: #00d4ff !important;
-            border-radius: 2px !important;
-            position: relative !important;
-        }
-
-        #dplayerContainer .dplayer-volume-bar-inner::after {
-            content: '' !important;
-            position: absolute !important;
-            right: -6px !important;
-            top: 50% !important;
-            transform: translateY(-50%) !important;
-            width: 12px !important;
-            height: 12px !important;
-            background: #00d4ff !important;
-            border-radius: 50% !important;
-            box-shadow: 0 0 8px rgba(0, 212, 255, 0.5) !important;
-        }
-
-        /* 时间显示 */
-        #dplayerContainer .dplayer-time {
-            color: #fff !important;
-            font-size: 12px !important;
-            font-family: 'Courier New', monospace !important;
-            margin: 0 8px !important;
-            min-width: 85px !important;
-            text-align: center !important;
-        }
-
-        /* 全屏按钮 */
-        #dplayerContainer .dplayer-full-icon {
-            margin-left: 8px !important;
-        }
-
-        /* 设置按钮 */
-        #dplayerContainer .dplayer-setting-icon {
-            margin-left: 8px !important;
-        }
-
-        /* ========== 播放按钮缩小 ========== */
-        #dplayerContainer .dplayer-play-icon {
-            position: absolute !important;
-            top: 50% !important;
-            left: 50% !important;
-            transform: translate(-50%, -50%) !important;
-            width: 50px !important; /* 从80px缩小到50px */
-            height: 50px !important;
-            background: rgba(0, 212, 255, 0.9) !important;
-            border-radius: 50% !important;
-            display: flex !important;
-            align-items: center !important;
-            justify-content: center !important;
-            cursor: pointer !important;
-            z-index: 99 !important;
-            transition: all 0.2s ease !important;
-            box-shadow: 0 4px 20px rgba(0, 212, 255, 0.4) !important;
-        }
-
-        #dplayerContainer .dplayer-play-icon:hover {
-            transform: translate(-50%, -50%) scale(1.1) !important;
-            background: #00d4ff !important;
-        }
-
-        #dplayerContainer .dplayer-play-icon svg {
-            width: 20px !important; /* 图标也相应缩小 */
-            height: 20px !important;
-            margin-left: 2px !important;
-        }
-
-        /* 加载动画 */
-        #dplayerContainer .dplayer-bezel {
-            position: absolute !important;
-            top: 50% !important;
-            left: 50% !important;
-            transform: translate(-50%, -50%) !important;
-            z-index: 98 !important;
-        }
-
-        /* 隐藏弹幕相关元素 */
-        #dplayerContainer .dplayer-danmaku {
-            display: none !important;
+            object-fit: cover;
+            transition: transform 0.5s;
         }
         
-        #dplayerContainer .dplayer-danmaku-bar {
-            display: none !important;
+        .video-card:hover .thumb img {
+            transform: scale(1.1);
         }
         
-        #dplayerContainer .dplayer-comment {
-            display: none !important;
+        .video-card .info {
+            padding: 12px;
         }
         
-        #dplayerContainer .dplayer-comment-box {
-            display: none !important;
+        .video-card .title {
+            font-size: 14px;
+            font-weight: 600;
+            margin-bottom: 4px;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+        
+        .video-card .meta {
+            font-size: 12px;
+            color: var(--text-secondary);
+        }
+        
+        /* 标签 */
+        .badge-vip {
+            position: absolute;
+            top: 8px;
+            left: 8px;
+            padding: 4px 8px;
+            background: linear-gradient(135deg, #FFD700, #FFA500);
+            color: #000;
+            font-size: 10px;
+            font-weight: 800;
+            border-radius: 4px;
+        }
+        
+        .badge-rating {
+            position: absolute;
+            top: 8px;
+            right: 8px;
+            padding: 4px 8px;
+            background: rgba(0,0,0,0.6);
+            backdrop-filter: blur(10px);
+            color: #FFD700;
+            font-size: 12px;
+            font-weight: 700;
+            border-radius: 4px;
+        }
+        
+        /* ==================== 页面内容区域 ==================== */
+        .page-content {
+            display: none;
+        }
+        
+        .page-content.active {
+            display: block;
+        }
+        
+        /* ==================== 播放器 ==================== */
+        .player-modal {
+            position: fixed;
+            inset: 0;
+            z-index: 1000;
+            background: #000;
+            display: none;
+        }
+        
+        .player-modal.active {
+            display: flex;
+            flex-direction: column;
+        }
+        
+        #dplayer {
+            flex: 1;
+        }
+        
+        /* ==================== Toast ==================== */
+        .toast {
+            position: fixed;
+            top: 80px;
+            left: 50%;
+            transform: translateX(-50%) translateY(-20px);
+            background: var(--surface);
+            color: var(--text-primary);
+            padding: 12px 24px;
+            border-radius: 8px;
+            border: 1px solid var(--border);
+            opacity: 0;
+            transition: all 0.3s;
+            z-index: 1001;
+        }
+        
+        .toast.show {
+            opacity: 1;
+            transform: translateX(-50%) translateY(0);
         }
     </style>
-    <script>
-        tailwind.config = {
-            darkMode: 'class',
-            theme: { 
-                extend: { 
-                    colors: { 
-                        primary: '#00d4ff', 
-                        secondary: '#7b2cbf', 
-                        accent: '#fbbf24', 
-                        dark: '#0f172a', 
-                        darker: '#020617', 
-                        surface: '#1e293b' 
-                    } 
-                } 
-            }
-        }
-    </script>
-<base target="_blank">
 </head>
-<body class="bg-gray-50 dark:bg-darker text-gray-900 dark:text-gray-100 min-h-screen pb-20">
+<body>
 
     <!-- 配置 -->
     <script>
-        const API_BASE = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1' 
-            ? 'http://localhost:3000' 
-            : `http://${window.location.hostname}:3000`;
+        const API_BASE = 'http://47.98.254.208:3000';
+        let currentTheme = 'dark';
+        let currentCategory = 'all';
+        let currentPage = 'home';
+        let carouselInterval = null;
+        let currentCarouselIndex = 0;
     </script>
 
-    <!-- 顶部状态栏 -->
-    <div class="sticky top-0 z-50 glass px-4 py-2 flex justify-between items-center text-xs font-medium">
-        <span id="clock">12:00</span>
-        <div class="flex items-center gap-2">
-            <i class="fas fa-signal"></i>
-            <i class="fas fa-wifi"></i>
-            <i class="fas fa-battery-full"></i>
-        </div>
-    </div>
-
-    <!-- 主导航栏 -->
-    <header class="sticky top-8 z-40 glass px-4 py-3 flex items-center justify-between">
-        <div class="flex items-center gap-2">
-            <div class="w-8 h-8 rounded-lg bg-gradient-to-br from-primary to-secondary flex items-center justify-center">
-                <i class="fas fa-play text-white text-xs"></i>
+    <!-- ==================== 左侧 Dock 栏（120px） ==================== -->
+    <nav class="side-dock">
+        <!-- 顶部横向导航 - GDX + 导航项 -->
+        <div class="dock-top">
+            <span class="dock-logo">GDX</span>
+            <div class="dock-top-item active" onclick="switchTopNav('home', this)">
+                <i class="fas fa-home"></i>
+                <span>首页</span>
             </div>
-            <span class="text-xl font-black italic tracking-tight gradient-text">GDX</span>
-        </div>
-        <div class="flex items-center gap-3">
-            <button onclick="toggleTheme()" class="w-8 h-8 rounded-full bg-gray-200 dark:bg-surface flex items-center justify-center transition-colors">
-                <i class="fas fa-moon dark:hidden text-gray-600"></i>
-                <i class="fas fa-sun hidden dark:block text-yellow-400"></i>
-            </button>
-            <button class="w-8 h-8 rounded-full bg-gray-200 dark:bg-surface flex items-center justify-center">
-                <i class="fas fa-search text-gray-600 dark:text-gray-300"></i>
-            </button>
-            <button onclick="showPage('profile')" class="w-8 h-8 rounded-full bg-gradient-to-r from-primary to-secondary flex items-center justify-center text-white text-xs font-bold" id="headerAvatar">
+            <div class="dock-top-item" onclick="switchTopNav('discover', this)">
+                <i class="fas fa-compass"></i>
+                <span>发现</span>
+            </div>
+            <div class="dock-top-item" onclick="switchTopNav('vip', this)">
+                <i class="fas fa-crown"></i>
+                <span>会员</span>
+            </div>
+            <div class="dock-top-item" onclick="switchTopNav('profile', this)">
                 <i class="fas fa-user"></i>
+                <span>我的</span>
+            </div>
+        </div>
+        
+        <!-- 中部垂直分类 -->
+        <div class="dock-categories" id="dockCategories">
+            <div class="dock-cat-item active" onclick="scrollToSection('hot', this)">正在热播</div>
+            <div class="dock-cat-item" onclick="scrollToSection('recommend', this)">推荐</div>
+            <div class="dock-cat-item" onclick="scrollToSection('movie', this)">电影</div>
+            <div class="dock-cat-item" onclick="scrollToSection('tv', this)">电视剧</div>
+            <div class="dock-cat-item" onclick="scrollToSection('variety', this)">综艺</div>
+            <div class="dock-cat-item" onclick="scrollToSection('anime', this)">动漫</div>
+            <div class="dock-cat-item" onclick="scrollToSection('documentary', this)">纪录片</div>
+        </div>
+        
+        <!-- 底部主题切换 - 竖向圆形按钮 -->
+        <div class="dock-bottom">
+            <button class="theme-btn bg-gray-900 active" onclick="setTheme('dark', this)" title="暗黑模式"></button>
+            <button class="theme-btn bg-gray-100" onclick="setTheme('light', this)" title="明亮模式"></button>
+            <button class="theme-btn bg-pink-200" onclick="setTheme('pink', this)" title="粉色模式"></button>
+        </div>
+    </nav>
+
+    <!-- ==================== 顶部栏 ==================== -->
+    <header class="top-bar">
+        <div class="flex items-center gap-4">
+            <!-- 已删除白色GDX -->
+        </div>
+        <div class="flex items-center gap-4">
+            <button class="w-10 h-10 rounded-full bg-white/10 flex items-center justify-center hover:bg-white/20 transition-colors">
+                <i class="fas fa-search"></i>
+            </button>
+            <button class="w-10 h-10 rounded-full bg-gradient-to-br from-green-400 to-green-600 flex items-center justify-center text-sm font-bold">
+                G
             </button>
         </div>
     </header>
 
-    <!-- 首页 -->
-    <div id="homePage" class="page active px-4 py-4">
-        <!-- 分类标签 -->
-        <div class="flex gap-3 mb-4 overflow-x-auto no-scrollbar pb-2" id="categoryTabs">
-            <button onclick="filterCategory('all')" class="category-tab px-4 py-1.5 rounded-full bg-primary text-white text-sm font-medium whitespace-nowrap transition-all" data-category="all">推荐</button>
-            <button onclick="filterCategory('movie')" class="category-tab px-4 py-1.5 rounded-full bg-gray-200 dark:bg-surface text-gray-600 dark:text-gray-300 text-sm whitespace-nowrap transition-all" data-category="movie">电影</button>
-            <button onclick="filterCategory('tv')" class="category-tab px-4 py-1.5 rounded-full bg-gray-200 dark:bg-surface text-gray-600 dark:text-gray-300 text-sm whitespace-nowrap transition-all" data-category="tv">电视剧</button>
-            <button onclick="filterCategory('variety')" class="category-tab px-4 py-1.5 rounded-full bg-gray-200 dark:bg-surface text-gray-600 dark:text-gray-300 text-sm whitespace-nowrap transition-all" data-category="variety">综艺</button>
-            <button onclick="filterCategory('anime')" class="category-tab px-4 py-1.5 rounded-full bg-gray-200 dark:bg-surface text-gray-600 dark:text-gray-300 text-sm whitespace-nowrap transition-all" data-category="anime">动漫</button>
-        </div>
-
-        <!-- Banner -->
-        <div id="bannerContainer" class="relative w-full h-48 rounded-xl overflow-hidden mb-6 group cursor-pointer">
-            <div class="w-full h-full flex items-center justify-center bg-gray-800 text-gray-500">
-                <i class="fas fa-spinner fa-spin mr-2"></i>加载中...
-            </div>
-        </div>
-
-        <!-- 正在热播 -->
-        <section class="mb-6" id="hotSection">
-            <div class="flex items-center justify-between mb-3">
-                <h2 class="text-lg font-bold flex items-center gap-2">
-                    <i class="fas fa-fire text-red-500"></i> 正在热播
-                </h2>
-            </div>
-            <div class="grid grid-cols-3 gap-3" id="hotVideos">
-                <div class="col-span-3 text-center py-8 text-gray-500">
-                    <i class="fas fa-spinner fa-spin mr-2"></i>加载中...
-                </div>
-            </div>
-        </section>
-
-        <!-- 最新上线 -->
-        <section class="mb-6" id="newSection">
-            <div class="flex items-center justify-between mb-3">
-                <h2 class="text-lg font-bold flex items-center gap-2">
-                    <i class="fas fa-bolt text-yellow-500"></i> 最新上线
-                </h2>
-            </div>
-            <div class="space-y-3" id="newVideos"></div>
-        </section>
-    </div>
-
-    <!-- 个人中心页 -->
-    <div id="profilePage" class="page px-4 py-6">
-        <div class="text-center mb-8">
-            <div class="w-24 h-24 mx-auto rounded-full bg-gradient-to-br from-primary to-secondary p-1 mb-4" id="userAvatarContainer">
-                <div class="w-full h-full rounded-full bg-gray-200 dark:bg-surface flex items-center justify-center text-4xl" id="userAvatar">
-                    <i class="fas fa-user text-gray-400"></i>
-                </div>
-            </div>
-            <div id="guestView">
-                <h2 class="text-2xl font-bold mb-2">游客模式</h2>
-                <p class="text-gray-500 mb-4">登录或注册后享受更多特权</p>
-                <div class="flex gap-3 justify-center">
-                    <button onclick="showAuthModal()" class="px-6 py-3 bg-primary text-black font-bold rounded-full hover:scale-105 active:scale-95 transition-transform shadow-lg shadow-primary/30">
-                        立即登录
-                    </button>
-                    <button onclick="showRegisterModal()" class="px-6 py-3 bg-gradient-to-r from-secondary to-primary text-white font-bold rounded-full hover:scale-105 active:scale-95 transition-transform shadow-lg shadow-secondary/30">
-                        注册账号
-                    </button>
-                </div>
-            </div>
-            <div id="loggedInView" class="hidden">
-                <h2 class="text-2xl font-bold mb-2" id="displayUsername">用户名</h2>
-                <div class="flex items-center justify-center gap-2 mb-2">
-                    <span class="vip-badge px-3 py-1 rounded-full text-sm font-bold text-black hidden" id="userVipBadge">VIP会员</span>
-                </div>
-                <p class="text-sm text-gray-500">有效期至：2026-12-31</p>
-            </div>
-        </div>
-
-        <div class="grid grid-cols-3 gap-4 mb-6">
-            <div class="glass rounded-xl p-4 text-center">
-                <div class="text-2xl font-bold text-primary" id="historyCount">0</div>
-                <div class="text-xs text-gray-500 mt-1">观看历史</div>
-            </div>
-            <div class="glass rounded-xl p-4 text-center">
-                <div class="text-2xl font-bold text-primary" id="favCount">0</div>
-                <div class="text-xs text-gray-500 mt-1">我的收藏</div>
-            </div>
-            <div class="glass rounded-xl p-4 text-center">
-                <div class="text-2xl font-bold text-primary">0</div>
-                <div class="text-xs text-gray-500 mt-1">下载缓存</div>
-            </div>
-        </div>
-
-        <div class="space-y-3">
-            <div class="glass rounded-xl p-4 flex items-center justify-between cursor-pointer active:scale-95 transition-transform" onclick="showToast('功能开发中')">
-                <div class="flex items-center gap-3">
-                    <div class="w-10 h-10 rounded-full bg-red-100 dark:bg-red-900/30 flex items-center justify-center text-red-500">
-                        <i class="fas fa-history"></i>
-                    </div>
-                    <span class="font-medium">观看历史</span>
-                </div>
-                <i class="fas fa-chevron-right text-gray-400 text-sm"></i>
-            </div>
-            <div class="glass rounded-xl p-4 flex items-center justify-between cursor-pointer active:scale-95 transition-transform" onclick="showToast('功能开发中')">
-                <div class="flex items-center gap-3">
-                    <div class="w-10 h-10 rounded-full bg-yellow-100 dark:bg-yellow-900/30 flex items-center justify-center text-yellow-500">
-                        <i class="fas fa-star"></i>
-                    </div>
-                    <span class="font-medium">我的收藏</span>
-                </div>
-                <i class="fas fa-chevron-right text-gray-400 text-sm"></i>
-            </div>
-        </div>
-
-        <button onclick="logout()" id="logoutBtn" class="hidden w-full glass rounded-xl p-4 flex items-center justify-center gap-2 text-red-500 mt-6 active:scale-95 transition-transform">
-            <i class="fas fa-sign-out-alt"></i>
-            <span class="font-medium">退出登录</span>
-        </button>
-    </div>
-
-    <!-- VIP页 - 暂时隐藏支付功能，仅作展示 -->
-    <div id="vipPage" class="page px-4 py-8">
-        <div class="text-center mb-8">
-            <i class="fas fa-crown text-6xl text-amber-500 mb-4"></i>
-            <h2 class="text-2xl font-bold mb-2">VIP会员中心</h2>
-            <p class="text-gray-500 text-sm">会员功能即将上线，敬请期待</p>
-        </div>
-        <div class="glass rounded-2xl p-6 border-2 border-amber-500/50 mb-6 opacity-60">
-            <div class="flex justify-between items-end mb-4">
-                <div>
-                    <h3 class="text-lg font-bold">连续包月</h3>
-                    <p class="text-sm text-gray-500 mt-1">首月特惠</p>
-                </div>
-                <div class="text-right">
-                    <span class="text-3xl font-bold text-amber-500">¥6</span>
-                    <span class="text-sm text-gray-500 line-through">¥25</span>
-                </div>
-            </div>
-            <button onclick="showToast('支付功能暂未开放')" class="w-full py-3 bg-gray-600 text-gray-300 rounded-xl font-bold cursor-not-allowed" disabled>
-                即将开放
-            </button>
-        </div>
-    </div>
-
-    <!-- 发现页 -->
-    <div id="discoverPage" class="page px-4 py-8 text-center">
-        <div class="w-24 h-24 mx-auto mb-4 rounded-full bg-gradient-to-br from-primary/20 to-secondary/20 flex items-center justify-center">
-            <i class="fas fa-compass text-4xl text-primary"></i>
-        </div>
-        <h2 class="text-xl font-bold mb-2">发现精彩</h2>
-        <p class="text-gray-500">功能开发中，敬请期待...</p>
-    </div>
-
-    <!-- 底部导航 -->
-    <nav class="fixed bottom-0 left-0 right-0 bg-white/90 dark:bg-darker/90 backdrop-blur-lg border-t border-gray-200 dark:border-gray-800 px-6 py-3 flex justify-around items-center z-50">
-        <button onclick="showPage('home')" class="nav-item flex flex-col items-center gap-1 text-primary" data-page="home">
-            <i class="fas fa-home text-xl"></i>
-            <span class="text-[10px] font-medium">首页</span>
-        </button>
-        <button onclick="showPage('discover')" class="nav-item flex flex-col items-center gap-1 text-gray-400" data-page="discover">
-            <i class="fas fa-compass text-xl"></i>
-            <span class="text-[10px] font-medium">发现</span>
-        </button>
-        <button onclick="showPage('vip')" class="nav-item flex flex-col items-center gap-1 text-gray-400" data-page="vip">
-            <i class="fas fa-crown text-xl"></i>
-            <span class="text-[10px] font-medium">会员</span>
-        </button>
-        <button onclick="showPage('profile')" class="nav-item flex flex-col items-center gap-1 text-gray-400" data-page="profile">
-            <i class="fas fa-user text-xl"></i>
-            <span class="text-[10px] font-medium">我的</span>
-        </button>
-    </nav>
-
-    <!-- 登录/注册模态框 -->
-    <div id="authModal" class="hidden fixed inset-0 z-[60] flex items-end sm:items-center justify-center bg-black/60 backdrop-blur-sm">
-        <div class="relative w-full max-w-md bg-white dark:bg-surface rounded-t-3xl sm:rounded-2xl p-6 transform transition-transform duration-300">
-            <div class="flex justify-between items-center mb-6">
-                <h3 class="text-xl font-bold" id="authTitle">登录</h3>
-                <button onclick="closeAuthModal()" class="w-8 h-8 rounded-full bg-gray-100 dark:bg-gray-800 flex items-center justify-center hover:scale-110 transition-transform">
-                    <i class="fas fa-times text-gray-500"></i>
-                </button>
-            </div>
-            <form id="authForm" onsubmit="handleAuth(event)" class="space-y-4">
-                <div>
-                    <label class="block text-sm text-gray-700 dark:text-gray-300 mb-2">账号</label>
-                    <input type="text" id="authUsername" required class="w-full px-4 py-3 rounded-xl bg-gray-100 dark:bg-darker border-2 border-transparent focus:border-primary outline-none transition-colors" placeholder="请输入账号（至少3位）">
-                </div>
-                <div>
-                    <label class="block text-sm text-gray-700 dark:text-gray-300 mb-2">密码</label>
-                    <input type="password" id="authPassword" required class="w-full px-4 py-3 rounded-xl bg-gray-100 dark:bg-darker border-2 border-transparent focus:border-primary outline-none transition-colors" placeholder="请输入密码（至少6位）">
-                </div>
-                <div id="registerFields" class="hidden space-y-4">
-                    <div>
-                        <label class="block text-sm text-gray-700 dark:text-gray-300 mb-2">确认密码</label>
-                        <input type="password" id="authPasswordConfirm" class="w-full px-4 py-3 rounded-xl bg-gray-100 dark:bg-darker border-2 border-transparent focus:border-primary outline-none transition-colors" placeholder="请再次输入密码">
-                    </div>
-                </div>
-                <div id="authError" class="hidden text-red-400 text-sm text-center bg-red-400/10 py-2 rounded-lg"></div>
-                <button type="submit" class="w-full py-3.5 bg-primary text-black font-bold rounded-xl shadow-lg hover:scale-[1.02] active:scale-95 transition-transform">
-                    <span id="authSubmitText">登录</span>
-                </button>
-            </form>
-            <div class="mt-6 text-center space-y-3">
-                <button onclick="toggleAuthMode()" class="text-sm text-primary hover:underline font-medium" id="authToggleBtn">
-                    还没有账号？立即注册
-                </button>
-            </div>
-        </div>
-    </div>
-
-    <!-- ========== 视频播放模态框（优化版） ========== -->
-    <div id="videoPlayerModal">
-        <!-- 顶部标题栏 -->
-        <div class="player-header">
-            <button onclick="closeVideoPlayer()" class="text-white w-10 h-10 flex items-center justify-center rounded-full bg-white/20 hover:bg-white/30 transition-colors">
-                <i class="fas fa-arrow-left"></i>
-            </button>
-            <h3 class="text-white font-medium truncate flex-1 mx-4 text-center text-sm" id="playerTitle">视频标题</h3>
-            <button onclick="showToast('更多功能开发中')" class="text-white w-10 h-10 flex items-center justify-center rounded-full bg-white/20 hover:bg-white/30 transition-colors">
-                <i class="fas fa-ellipsis-h"></i>
-            </button>
-        </div>
+    <!-- ==================== 主内容区 ==================== -->
+    <main class="main-content">
         
-        <!-- 播放器主体 -->
-        <div class="player-body">
-            <div id="dplayerContainer"></div>
-        </div>
-    </div>
+        <!-- 首页页面 -->
+        <div id="page-home" class="page-content active">
+            <!-- 正在热播 -->
+            <section id="section-hot" class="hero-section">
+                <h2 class="section-title">
+                    <i class="fas fa-fire"></i>
+                    正在热播
+                </h2>
+                <div class="hot-scroll no-scrollbar" id="hotContainer">
+                    <!-- 动态生成 -->
+                </div>
+                <!-- 轮播指示器 -->
+                <div class="carousel-indicators" id="carouselIndicators"></div>
+            </section>
 
-    <!-- VIP限制提示模态框 -->
-    <div id="vipLimitModal" class="hidden fixed inset-0 z-[70] flex items-center justify-center bg-black/80 backdrop-blur-sm">
-        <div class="glass rounded-2xl p-6 w-full max-w-sm mx-4 text-center">
-            <i class="fas fa-crown text-5xl text-amber-500 mb-4"></i>
-            <h3 class="text-xl font-bold mb-2">VIP专享内容</h3>
-            <p class="text-gray-400 text-sm mb-6">该视频为VIP专享，开通会员后即可观看</p>
-            <div class="space-y-3">
-                <button onclick="closeVipLimit(); showPage('vip')" class="w-full py-3 bg-gradient-to-r from-amber-500 to-orange-500 text-white rounded-xl font-bold">
-                    了解VIP会员
-                </button>
-                <button onclick="closeVipLimit()" class="w-full py-3 bg-gray-700 text-white rounded-xl">
-                    暂不观看
-                </button>
+            <!-- 推荐 -->
+            <section id="section-recommend" class="category-section">
+                <h2 class="section-title">
+                    <i class="fas fa-thumbs-up"></i>
+                    精选推荐
+                </h2>
+                <div class="video-grid" id="grid-recommend"></div>
+            </section>
+
+            <!-- 电影 -->
+            <section id="section-movie" class="category-section">
+                <h2 class="section-title">
+                    <i class="fas fa-film"></i>
+                    电影
+                </h2>
+                <div class="video-grid" id="grid-movie"></div>
+            </section>
+
+            <!-- 电视剧 -->
+            <section id="section-tv" class="category-section">
+                <h2 class="section-title">
+                    <i class="fas fa-tv"></i>
+                    电视剧
+                </h2>
+                <div class="video-grid" id="grid-tv"></div>
+            </section>
+
+            <!-- 综艺 -->
+            <section id="section-variety" class="category-section">
+                <h2 class="section-title">
+                    <i class="fas fa-laugh-beam"></i>
+                    综艺
+                </h2>
+                <div class="video-grid" id="grid-variety"></div>
+            </section>
+
+            <!-- 动漫 -->
+            <section id="section-anime" class="category-section">
+                <h2 class="section-title">
+                    <i class="fas fa-dragon"></i>
+                    动漫
+                </h2>
+                <div class="video-grid" id="grid-anime"></div>
+            </section>
+
+            <!-- 纪录片 -->
+            <section id="section-documentary" class="category-section">
+                <h2 class="section-title">
+                    <i class="fas fa-globe"></i>
+                    纪录片
+                </h2>
+                <div class="video-grid" id="grid-documentary"></div>
+            </section>
+        </div>
+
+        <!-- 发现页面 -->
+        <div id="page-discover" class="page-content">
+            <div class="hero-section">
+                <h2 class="section-title">
+                    <i class="fas fa-compass"></i>
+                    发现精彩
+                </h2>
+                <div class="video-grid" id="grid-discover"></div>
             </div>
         </div>
+
+        <!-- 会员页面 -->
+        <div id="page-vip" class="page-content">
+            <div class="hero-section">
+                <h2 class="section-title">
+                    <i class="fas fa-crown text-yellow-500"></i>
+                    VIP会员专区
+                </h2>
+                <div class="video-grid" id="grid-vip"></div>
+            </div>
+        </div>
+
+        <!-- 我的页面 -->
+        <div id="page-profile" class="page-content">
+            <div class="hero-section">
+                <h2 class="section-title">
+                    <i class="fas fa-user"></i>
+                    个人中心
+                </h2>
+                <div class="p-8 bg-[var(--elevated)] rounded-2xl max-w-2xl">
+                    <div class="flex items-center gap-6 mb-8">
+                        <div class="w-20 h-20 rounded-full bg-gradient-to-br from-green-400 to-green-600 flex items-center justify-center text-2xl font-bold">
+                            G
+                        </div>
+                        <div>
+                            <h3 class="text-2xl font-bold mb-2">用户昵称</h3>
+                            <p class="text-[var(--text-secondary)]">VIP会员有效期至 2025-12-31</p>
+                        </div>
+                    </div>
+                    <div class="grid grid-cols-3 gap-4">
+                        <div class="p-4 bg-[var(--surface)] rounded-xl text-center">
+                            <div class="text-2xl font-bold text-[var(--primary)]">128</div>
+                            <div class="text-sm text-[var(--text-secondary)]">观看历史</div>
+                        </div>
+                        <div class="p-4 bg-[var(--surface)] rounded-xl text-center">
+                            <div class="text-2xl font-bold text-[var(--primary)]">36</div>
+                            <div class="text-sm text-[var(--text-secondary)]">我的收藏</div>
+                        </div>
+                        <div class="p-4 bg-[var(--surface)] rounded-xl text-center">
+                            <div class="text-2xl font-bold text-[var(--primary)]">12</div>
+                            <div class="text-sm text-[var(--text-secondary)]">下载缓存</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+    </main>
+
+    <!-- 播放器 -->
+    <div class="player-modal" id="playerModal" onclick="if(event.target === this) closePlayer()">
+        <div id="dplayer"></div>
     </div>
 
     <!-- Toast -->
-    <div id="toast" class="bg-gray-800 text-white px-6 py-3 rounded-full shadow-2xl flex items-center gap-2 pointer-events-none">
-        <i id="toastIcon" class="fas fa-check-circle text-green-400"></i>
-        <span id="toastMessage">操作成功</span>
-    </div>
+    <div class="toast" id="toast">操作成功</div>
 
+    <!-- JavaScript -->
     <script>
-        // ========== 全局配置 ==========
-        let videoList = [];
-        let currentCategory = 'all';
-        let currentUser = null;
-        let currentVideo = null;
-        let dp = null;
-        let isRegisterMode = false;
+        // 示例数据
+        const sampleImages = [
+            'https://images.unsplash.com/photo-1536440136628-849c177e76a1?w=800&h=450&fit=crop',
+            'https://images.unsplash.com/photo-1626814026160-2237a95fc5a0?w=800&h=450&fit=crop',
+            'https://images.unsplash.com/photo-1518676590629-3dcbd9c5a5c9?w=800&h=450&fit=crop',
+            'https://images.unsplash.com/photo-1440404653325-ab127d49abc1?w=400&h=225&fit=crop',
+            'https://images.unsplash.com/photo-1493225457124-a3eb161ffa5f?w=400&h=225&fit=crop',
+            'https://images.unsplash.com/photo-1516280440614-6697288d5d38?w=400&h=225&fit=crop'
+        ];
 
-        // ========== 工具函数 ==========
-        function safeGet(key, def) {
-            try {
-                const d = localStorage.getItem(key);
-                return d ? JSON.parse(d) : def;
-            } catch(e) { return def; }
-        }
-
-        function formatSize(bytes) {
-            if (!bytes) return '';
-            const u = ['B', 'KB', 'MB', 'GB'];
-            const i = Math.floor(Math.log(bytes) / Math.log(1024));
-            return (bytes / Math.pow(1024, i)).toFixed(1) + u[i];
-        }
-
-        // ========== 时钟 ==========
-        function updateClock() {
-            const now = new Date();
-            document.getElementById('clock').textContent = 
-                String(now.getHours()).padStart(2, '0') + ':' + 
-                String(now.getMinutes()).padStart(2, '0');
-        }
-        setInterval(updateClock, 1000);
-        updateClock();
-
-        // ========== 主题 ==========
-        if (localStorage.theme === 'dark' || (!('theme' in localStorage) && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
-            document.documentElement.classList.add('dark');
-        }
-
-        function toggleTheme() {
-            if (document.documentElement.classList.contains('dark')) {
-                document.documentElement.classList.remove('dark');
-                localStorage.theme = 'light';
-            } else {
-                document.documentElement.classList.add('dark');
-                localStorage.theme = 'dark';
-            }
-        }
-
-        // ========== 页面导航 ==========
-        function showPage(pageName) {
-            document.querySelectorAll('.page').forEach(page => page.classList.remove('active'));
-            document.getElementById(pageName + 'Page').classList.add('active');
-            
-            document.querySelectorAll('.nav-item').forEach(item => {
-                const icon = item.querySelector('i');
-                const text = item.querySelector('span');
-                if (item.dataset.page === pageName) {
-                    icon.classList.remove('text-gray-400');
-                    icon.classList.add('text-primary');
-                    text.classList.remove('text-gray-400');
-                    text.classList.add('text-primary');
-                } else {
-                    icon.classList.add('text-gray-400');
-                    icon.classList.remove('text-primary');
-                    text.classList.add('text-gray-400');
-                    text.classList.remove('text-primary');
-                }
-            });
-
-            if (pageName === 'home') loadVideos();
-        }
-
-        // ========== 视频加载 ==========
-        function loadVideos() {
-            videoList = safeGet('gdx_videos', []);
-            console.log('加载视频列表:', videoList.length, '个');
-            
-            if (videoList.length === 0) {
-                document.getElementById('hotVideos').innerHTML = `
-                    <div class="col-span-3 text-center py-8 text-gray-500">
-                        <i class="fas fa-video-slash text-4xl mb-2"></i>
-                        <p>暂无视频</p>
-                        <p class="text-xs mt-1">请在管理平台上传视频</p>
-                    </div>
-                `;
-                document.getElementById('newVideos').innerHTML = '';
-                document.getElementById('bannerContainer').innerHTML = `
-                    <div class="w-full h-full flex items-center justify-center bg-gray-800 text-gray-500">
-                        <p>暂无推荐内容</p>
-                    </div>
-                `;
-                return;
-            }
-
-            renderBanner();
-            renderHotVideos();
-            renderNewVideos();
-        }
-
-        function renderBanner() {
-            const bannerVideo = videoList.filter(v => v.isVip).pop() || videoList[videoList.length - 1];
-            if (!bannerVideo) return;
-
-            document.getElementById('bannerContainer').innerHTML = `
-                <div class="relative w-full h-full group cursor-pointer" onclick="playVideoById(${bannerVideo.id})">
-                    <img src="${bannerVideo.coverUrl || bannerVideo.cover}" class="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105" 
-                         onerror="this.src='https://via.placeholder.com/800x480?text=No+Cover'">
-                    <div class="absolute inset-0 bg-gradient-to-t from-black/80 to-transparent"></div>
-                    <div class="absolute bottom-0 left-0 p-4 w-full">
-                        ${bannerVideo.isVip ? '<span class="vip-badge px-2 py-0.5 rounded text-xs font-bold text-black mb-1 inline-block">VIP</span>' : ''}
-                        <h3 class="text-white font-bold text-lg">${bannerVideo.title}</h3>
-                        <p class="text-gray-300 text-xs mt-1">${bannerVideo.rating || 8.0}分 · ${getCategoryName(bannerVideo.category)}</p>
-                    </div>
-                </div>
-            `;
-        }
-
-        function renderHotVideos() {
-            const container = document.getElementById('hotVideos');
-            let displayVideos = currentCategory === 'all' 
-                ? videoList 
-                : videoList.filter(v => v.category === currentCategory);
-
-            displayVideos = displayVideos.slice(0, 6);
-
-            if (displayVideos.length === 0) {
-                container.innerHTML = '<div class="col-span-3 text-center py-8 text-gray-500">该分类暂无视频</div>';
-                return;
-            }
-
-            container.innerHTML = displayVideos.map(v => `
-                <div class="video-card" onclick="playVideoById(${v.id})">
-                    <div class="relative rounded-lg overflow-hidden aspect-[3/4]">
-                        <img src="${v.coverUrl || v.cover}" class="w-full h-full object-cover" 
-                             onerror="this.src='https://via.placeholder.com/300x400?text=No+Cover'">
-                        ${v.isVip ? '<div class="absolute top-1 left-1 vip-badge px-1.5 py-0.5 rounded text-[10px] font-bold text-black">VIP</div>' : ''}
-                        <div class="absolute bottom-1 right-1 bg-black/60 px-1 rounded text-[10px] text-white">${v.rating || 8.0}分</div>
-                    </div>
-                    <h3 class="mt-2 text-sm font-medium line-clamp-1">${v.title}</h3>
-                    <p class="text-xs text-gray-500 mt-0.5">${getCategoryName(v.category)}</p>
-                </div>
-            `).join('');
-        }
-
-        function renderNewVideos() {
-            const container = document.getElementById('newVideos');
-            const newVideos = videoList.slice(-4).reverse();
-
-            if (newVideos.length === 0) {
-                container.innerHTML = '';
-                return;
-            }
-
-            container.innerHTML = newVideos.map(v => `
-                <div class="flex gap-3 cursor-pointer" onclick="playVideoById(${v.id})">
-                    <div class="w-32 h-20 rounded-lg overflow-hidden flex-shrink-0 relative">
-                        <img src="${v.coverUrl || v.cover}" class="w-full h-full object-cover" 
-                             onerror="this.src='https://via.placeholder.com/320x180?text=No+Cover'">
-                        <div class="absolute inset-0 flex items-center justify-center bg-black/20">
-                            <i class="fas fa-play-circle text-white/80 text-2xl"></i>
-                        </div>
-                    </div>
-                    <div class="flex-1 py-1">
-                        <h3 class="font-medium line-clamp-1">${v.title}</h3>
-                        <p class="text-xs text-gray-500 mt-1 line-clamp-2">${v.desc || '暂无简介'}</p>
-                        <div class="flex items-center gap-2 mt-2">
-                            <span class="text-xs text-primary">${v.rating || 8.0}分</span>
-                            ${v.isVip ? '<span class="vip-badge px-1.5 py-0.5 rounded text-[10px] font-bold text-black">VIP</span>' : ''}
-                        </div>
-                    </div>
-                </div>
-            `).join('');
-        }
-
-        function filterCategory(category) {
-            currentCategory = category;
-            document.querySelectorAll('.category-tab').forEach(btn => {
-                if (btn.dataset.category === category) {
-                    btn.classList.remove('bg-gray-200', 'dark:bg-surface', 'text-gray-600', 'dark:text-gray-300');
-                    btn.classList.add('bg-primary', 'text-white');
-                } else {
-                    btn.classList.add('bg-gray-200', 'dark:bg-surface', 'text-gray-600', 'dark:text-gray-300');
-                    btn.classList.remove('bg-primary', 'text-white');
-                }
-            });
-            renderHotVideos();
-        }
-
-        function getCategoryName(cat) {
-            const map = { movie: '电影', tv: '电视剧', variety: '综艺', anime: '动漫', documentary: '纪录片' };
-            return map[cat] || cat || '其他';
-        }
-
-        // ========== 视频播放（优化版） ==========
-        function playVideoById(id) {
-            const video = videoList.find(v => v.id === id);
-            if (!video) {
-                showToast('视频不存在', 'error');
-                return;
-            }
-
-            // VIP权限检查
-            if (video.isVip && !currentUser?.isVip) {
-                document.getElementById('vipLimitModal').classList.remove('hidden');
-                return;
-            }
-
-            currentVideo = video;
-            document.getElementById('playerTitle').textContent = video.title;
-            
-            // 显示播放器
-            const modal = document.getElementById('videoPlayerModal');
-            modal.classList.add('active');
-            document.body.style.overflow = 'hidden';
-
-            // 销毁旧实例
-            if (dp) {
-                dp.destroy();
-                dp = null;
-            }
-
-            const videoUrl = video.videoUrl || video.url;
-            console.log('播放视频:', videoUrl);
-
-            // 延迟初始化确保DOM就绪
-            setTimeout(() => {
-                const container = document.getElementById('dplayerContainer');
-                
-                // 强制清空容器
-                container.innerHTML = '';
-                
-                dp = new DPlayer({
-                    container: container,
-                    video: {
-                        url: videoUrl,
-                        type: 'auto',
-                        pic: video.coverUrl || video.cover
-                    },
-                    autoplay: true,
-                    theme: '#00d4ff',
-                    lang: 'zh-cn',
-                    preload: 'auto',
-                    screenshot: true,
-                    volume: 0.8,
-                    controls: true,
-                    loop: false,
-                    hotkey: true,
-                    // 禁用弹幕
-                    danmaku: null,
-                    contextmenu: [
-                        { text: 'GDX视频平台', link: '#' }
-                    ]
-                });
-
-                // 错误处理
-                dp.on('error', () => {
-                    showToast('视频加载失败，请检查网络', 'error');
-                });
-
-            }, 100);
-
-            addToHistory(video);
-        }
-
-        function closeVideoPlayer() {
-            const modal = document.getElementById('videoPlayerModal');
-            modal.classList.remove('active');
-            document.body.style.overflow = '';
-            
-            if (dp) {
-                dp.destroy();
-                dp = null;
-            }
-        }
-
-        function closeVipLimit() {
-            document.getElementById('vipLimitModal').classList.add('hidden');
-        }
-
-        function addToHistory(video) {
-            let history = safeGet('gdx_watch_history', []);
-            history = history.filter(h => h.id !== video.id);
-            history.unshift({ ...video, watchedAt: new Date().toISOString() });
-            if (history.length > 50) history = history.slice(0, 50);
-            localStorage.setItem('gdx_watch_history', JSON.stringify(history));
-            updateHistoryCount();
-        }
-
-        function updateHistoryCount() {
-            const history = safeGet('gdx_watch_history', []);
-            document.getElementById('historyCount').textContent = history.length;
-        }
-
-        // ========== 用户系统 ==========
-        function getAccountsFromPlatform() {
-            const data = localStorage.getItem('gdx_users');
-            if (data) {
-                try {
-                    const users = JSON.parse(data);
-                    const accounts = {};
-                    users.forEach(u => {
-                        accounts[u.username] = { password: u.password, isVip: u.isVip };
-                    });
-                    return accounts;
-                } catch (e) {}
-            }
-            return {
-                'GDX': { password: '666', isVip: true },
-                'user001': { password: '123456', isVip: true },
-                'test': { password: 'test123', isVip: false }
+        function generateVideos() {
+            const categories = ['movie', 'tv', 'variety', 'anime', 'documentary'];
+            const titles = {
+                movie: ['星际穿越', '盗梦空间', '肖申克的救赎', '阿甘正传', '泰坦尼克号'],
+                tv: ['狂飙', '三体', '隐秘的角落', '庆余年', '漫长的季节'],
+                variety: ['乐队的夏天', '脱口秀大会', '奇葩说', '向往的生活', '奔跑吧'],
+                anime: ['千与千寻', '你的名字', '鬼灭之刃', '进击的巨人', '间谍过家家'],
+                documentary: ['地球脉动', '舌尖上的中国', '我在故宫修文物', '人间世', '航拍中国']
             };
+            
+            let videos = [];
+            let id = 1;
+            
+            categories.forEach(cat => {
+                titles[cat].forEach((title, idx) => {
+                    videos.push({
+                        id: id++,
+                        title: title,
+                        category: cat,
+                        cover: sampleImages[idx % sampleImages.length],
+                        rating: (8 + Math.random() * 2).toFixed(1),
+                        isVip: Math.random() > 0.5,
+                        views: Math.floor(Math.random() * 1000000)
+                    });
+                });
+            });
+            
+            return videos;
         }
 
-        function showAuthModal() {
-            document.getElementById('authModal').classList.remove('hidden');
-            document.body.style.overflow = 'hidden';
-            isRegisterMode = false;
-            updateAuthUI();
+        const allVideos = generateVideos();
+        let dp = null;
+        let hotVideos = [];
+
+        // 初始化
+        function init() {
+            // 读取保存的主题
+            const savedTheme = localStorage.getItem('theme') || 'dark';
+            setTheme(savedTheme, document.querySelector(`.theme-btn[onclick*="${savedTheme}"]`));
+            
+            renderHotSection();
+            renderCategorySections();
+            renderDiscoverPage();
+            renderVipPage();
+            setupScrollSpy();
         }
 
-        function showRegisterModal() {
-            document.getElementById('authModal').classList.remove('hidden');
-            document.body.style.overflow = 'hidden';
-            isRegisterMode = true;
-            updateAuthUI();
+        // 渲染正在热播（横向大卡片轮播）
+        function renderHotSection() {
+            hotVideos = allVideos.filter(v => v.isVip).slice(0, 5);
+            const container = document.getElementById('hotContainer');
+            const indicatorsContainer = document.getElementById('carouselIndicators');
+            
+            container.innerHTML = hotVideos.map((v, index) => `
+                <div class="hot-card" data-index="${index}" onclick="playVideo(${v.id})">
+                    <img src="${v.cover}" alt="${v.title}">
+                    <div class="overlay">
+                        <div class="play-btn">
+                            <i class="fas fa-play text-2xl text-white ml-1"></i>
+                        </div>
+                        <div class="title">${v.title}</div>
+                        <div class="meta">
+                            <span class="text-amber-400"><i class="fas fa-star mr-1"></i>${v.rating}</span>
+                            <span>${(v.views / 10000).toFixed(1)}万次播放</span>
+                            <span class="px-2 py-1 bg-white/20 rounded text-xs">${v.isVip ? 'VIP' : '免费'}</span>
+                        </div>
+                    </div>
+                </div>
+            `).join('');
+            
+            // 生成指示器
+            indicatorsContainer.innerHTML = hotVideos.map((_, index) => `
+                <div class="carousel-dot ${index === 0 ? 'active' : ''}" onclick="goToCarouselSlide(${index})"></div>
+            `).join('');
+            
+            // 启动自动轮播
+            startCarousel();
+            
+            // 监听滚动更新指示器
+            container.addEventListener('scroll', updateCarouselIndicator);
         }
 
-        function closeAuthModal() {
-            document.getElementById('authModal').classList.add('hidden');
-            document.body.style.overflow = '';
-            document.getElementById('authForm').reset();
-            document.getElementById('authError').classList.add('hidden');
+        // 启动自动轮播
+        function startCarousel() {
+            if (carouselInterval) clearInterval(carouselInterval);
+            carouselInterval = setInterval(() => {
+                const container = document.getElementById('hotContainer');
+                const nextIndex = (currentCarouselIndex + 1) % hotVideos.length;
+                goToCarouselSlide(nextIndex);
+            }, 5000);
         }
 
-        function toggleAuthMode() {
-            isRegisterMode = !isRegisterMode;
-            updateAuthUI();
-            document.getElementById('authError').classList.add('hidden');
-        }
-
-        function updateAuthUI() {
-            const title = document.getElementById('authTitle');
-            const submitText = document.getElementById('authSubmitText');
-            const toggleBtn = document.getElementById('authToggleBtn');
-            const registerFields = document.getElementById('registerFields');
-
-            if (isRegisterMode) {
-                title.textContent = '注册账号';
-                submitText.textContent = '立即注册';
-                toggleBtn.textContent = '已有账号？立即登录';
-                registerFields.classList.remove('hidden');
-            } else {
-                title.textContent = '登录';
-                submitText.textContent = '登录';
-                toggleBtn.textContent = '还没有账号？立即注册';
-                registerFields.classList.add('hidden');
+        // 跳转到指定轮播项
+        function goToCarouselSlide(index) {
+            const container = document.getElementById('hotContainer');
+            const cards = container.querySelectorAll('.hot-card');
+            if (cards[index]) {
+                cards[index].scrollIntoView({ behavior: 'smooth', inline: 'start', block: 'nearest' });
+                currentCarouselIndex = index;
+                updateCarouselIndicator();
             }
         }
 
-        function handleAuth(e) {
-            e.preventDefault();
-            const username = document.getElementById('authUsername').value.trim();
-            const password = document.getElementById('authPassword').value;
-            const errorDiv = document.getElementById('authError');
-
-            if (username.length < 3) {
-                errorDiv.textContent = '账号至少需要3个字符';
-                errorDiv.classList.remove('hidden');
-                return;
+        // 更新轮播指示器
+        function updateCarouselIndicator() {
+            const container = document.getElementById('hotContainer');
+            const dots = document.querySelectorAll('.carousel-dot');
+            const cards = container.querySelectorAll('.hot-card');
+            const scrollLeft = container.scrollLeft;
+            const cardWidth = cards[0]?.offsetWidth + 24 || 664; // 卡片宽度 + gap
+            
+            const newIndex = Math.round(scrollLeft / cardWidth);
+            if (newIndex !== currentCarouselIndex && newIndex >= 0 && newIndex < hotVideos.length) {
+                currentCarouselIndex = newIndex;
             }
+            
+            dots.forEach((dot, index) => {
+                dot.classList.toggle('active', index === currentCarouselIndex);
+            });
+        }
 
-            if (password.length < 6) {
-                errorDiv.textContent = '密码至少需要6个字符';
-                errorDiv.classList.remove('hidden');
-                return;
-            }
-
-            if (isRegisterMode) {
-                const confirmPassword = document.getElementById('authPasswordConfirm').value;
-                if (password !== confirmPassword) {
-                    errorDiv.textContent = '两次输入的密码不一致';
-                    errorDiv.classList.remove('hidden');
-                    return;
-                }
-
-                const accounts = getAccountsFromPlatform();
-                if (accounts[username]) {
-                    errorDiv.textContent = '该账号已被注册';
-                    errorDiv.classList.remove('hidden');
-                    return;
-                }
-
-                const newUser = {
-                    id: Date.now(),
-                    username: username,
-                    password: password,
-                    isVip: false,
-                    createdAt: new Date().toISOString()
-                };
-
-                let users = safeGet('gdx_users', []);
-                users.push(newUser);
-                localStorage.setItem('gdx_users', JSON.stringify(users));
-                
-                window.dispatchEvent(new StorageEvent('storage', {
-                    key: 'gdx_users',
-                    newValue: JSON.stringify(users)
-                }));
-
-                errorDiv.textContent = '注册成功！请登录';
-                errorDiv.className = 'text-green-400 text-sm text-center bg-green-400/10 py-2 rounded-lg';
-                errorDiv.classList.remove('hidden');
-                
-                setTimeout(() => {
-                    isRegisterMode = false;
-                    updateAuthUI();
-                    document.getElementById('authPassword').value = '';
-                    document.getElementById('authPasswordConfirm').value = '';
-                    errorDiv.classList.add('hidden');
-                }, 1500);
-
-            } else {
-                const accounts = getAccountsFromPlatform();
-
-                if (accounts[username] && accounts[username].password === password) {
-                    currentUser = {
-                        username: username,
-                        isVip: accounts[username].isVip
-                    };
-                    localStorage.setItem('gdx_app_user', JSON.stringify(currentUser));
-                    updateUIForLoggedInUser();
-                    closeAuthModal();
-                    showToast('登录成功！');
+        // 渲染各分类区块
+        function renderCategorySections() {
+            const categories = ['recommend', 'movie', 'tv', 'variety', 'anime', 'documentary'];
+            
+            categories.forEach(cat => {
+                let videos;
+                if (cat === 'recommend') {
+                    videos = allVideos.sort(() => Math.random() - 0.5).slice(0, 8);
                 } else {
-                    errorDiv.textContent = '账号或密码错误！';
-                    errorDiv.classList.remove('hidden');
+                    videos = allVideos.filter(v => v.category === cat).slice(0, 8);
                 }
+                
+                const container = document.getElementById('grid-' + cat);
+                if (container) {
+                    container.innerHTML = videos.map(v => `
+                        <div class="video-card" onclick="playVideo(${v.id})">
+                            <div class="thumb">
+                                <img src="${v.cover}" alt="${v.title}">
+                                ${v.isVip ? '<div class="badge-vip">VIP</div>' : ''}
+                                <div class="badge-rating"><i class="fas fa-star mr-1"></i>${v.rating}</div>
+                            </div>
+                            <div class="info">
+                                <div class="title">${v.title}</div>
+                                <div class="meta">${(v.views / 10000).toFixed(1)}万次播放</div>
+                            </div>
+                        </div>
+                    `).join('');
+                }
+            });
+        }
+
+        // 渲染发现页面
+        function renderDiscoverPage() {
+            const container = document.getElementById('grid-discover');
+            if (container) {
+                const videos = allVideos.sort(() => Math.random() - 0.5).slice(0, 12);
+                container.innerHTML = videos.map(v => `
+                    <div class="video-card" onclick="playVideo(${v.id})">
+                        <div class="thumb">
+                            <img src="${v.cover}" alt="${v.title}">
+                            ${v.isVip ? '<div class="badge-vip">VIP</div>' : ''}
+                            <div class="badge-rating"><i class="fas fa-star mr-1"></i>${v.rating}</div>
+                        </div>
+                        <div class="info">
+                            <div class="title">${v.title}</div>
+                            <div class="meta">${(v.views / 10000).toFixed(1)}万次播放</div>
+                        </div>
+                    </div>
+                `).join('');
             }
         }
 
-        function updateUIForLoggedInUser() {
-            if (!currentUser) return;
-
-            document.getElementById('guestView').classList.add('hidden');
-            document.getElementById('loggedInView').classList.remove('hidden');
-            document.getElementById('logoutBtn').classList.remove('hidden');
-            document.getElementById('displayUsername').textContent = currentUser.username;
-
-            const avatar = document.getElementById('userAvatar');
-            avatar.innerHTML = `<span class="text-3xl font-bold text-white">${currentUser.username.charAt(0).toUpperCase()}</span>`;
-            avatar.classList.remove('bg-gray-200', 'dark:bg-surface');
-            avatar.classList.add('bg-gradient-to-br', 'from-primary', 'to-secondary');
-
-            document.getElementById('headerAvatar').innerHTML = `<span class="font-bold">${currentUser.username.charAt(0).toUpperCase()}</span>`;
-
-            const vipBadge = document.getElementById('userVipBadge');
-            if (currentUser.isVip) {
-                vipBadge.classList.remove('hidden');
-            } else {
-                vipBadge.classList.add('hidden');
+        // 渲染VIP页面
+        function renderVipPage() {
+            const container = document.getElementById('grid-vip');
+            if (container) {
+                const videos = allVideos.filter(v => v.isVip).slice(0, 12);
+                container.innerHTML = videos.map(v => `
+                    <div class="video-card" onclick="playVideo(${v.id})">
+                        <div class="thumb">
+                            <img src="${v.cover}" alt="${v.title}">
+                            <div class="badge-vip">VIP</div>
+                            <div class="badge-rating"><i class="fas fa-star mr-1"></i>${v.rating}</div>
+                        </div>
+                        <div class="info">
+                            <div class="title">${v.title}</div>
+                            <div class="meta">${(v.views / 10000).toFixed(1)}万次播放</div>
+                        </div>
+                    </div>
+                `).join('');
             }
-
-            updateHistoryCount();
         }
 
-        function logout() {
-            currentUser = null;
-            localStorage.removeItem('gdx_app_user');
-
-            document.getElementById('guestView').classList.remove('hidden');
-            document.getElementById('loggedInView').classList.add('hidden');
-            document.getElementById('logoutBtn').classList.add('hidden');
-
-            const avatar = document.getElementById('userAvatar');
-            avatar.innerHTML = '<i class="fas fa-user text-gray-400"></i>';
-            avatar.classList.add('bg-gray-200', 'dark:bg-surface');
-            avatar.classList.remove('bg-gradient-to-br', 'from-primary', 'to-secondary');
-
-            document.getElementById('headerAvatar').innerHTML = '<i class="fas fa-user"></i>';
-
-            showToast('已退出登录');
+        // 滚动到指定区块
+        function scrollToSection(sectionId, element) {
+            // 只在首页时启用滚动
+            if (currentPage !== 'home') {
+                switchTopNav('home', document.querySelector('.dock-top-item[onclick*="home"]'));
+            }
+            
+            document.querySelectorAll('.dock-cat-item').forEach(el => el.classList.remove('active'));
+            element.classList.add('active');
+            
+            const target = document.getElementById('section-' + sectionId);
+            if (target) {
+                target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            }
         }
 
-        // ========== Toast ==========
-        function showToast(message, type = 'success') {
+        // 滚动监听（自动高亮左侧）
+        function setupScrollSpy() {
+            const sections = ['hot', 'recommend', 'movie', 'tv', 'variety', 'anime', 'documentary'];
+            const catItems = document.querySelectorAll('.dock-cat-item');
+            
+            window.addEventListener('scroll', () => {
+                if (currentPage !== 'home') return;
+                
+                const scrollPos = window.scrollY + 100;
+                
+                sections.forEach((section, index) => {
+                    const element = document.getElementById('section-' + section);
+                    if (element) {
+                        const offsetTop = element.offsetTop;
+                        const offsetBottom = offsetTop + element.offsetHeight;
+                        
+                        if (scrollPos >= offsetTop && scrollPos < offsetBottom) {
+                            catItems.forEach(el => el.classList.remove('active'));
+                            catItems[index].classList.add('active');
+                        }
+                    }
+                });
+            });
+        }
+
+        // 顶部导航切换 - 修复：实现页面切换逻辑
+        function switchTopNav(nav, element) {
+            document.querySelectorAll('.dock-top-item').forEach(el => el.classList.remove('active'));
+            element.classList.add('active');
+            
+            currentPage = nav;
+            
+            // 隐藏所有页面
+            document.querySelectorAll('.page-content').forEach(page => {
+                page.classList.remove('active');
+            });
+            
+            // 显示目标页面
+            const targetPage = document.getElementById('page-' + nav);
+            if (targetPage) {
+                targetPage.classList.add('active');
+            }
+            
+            // 控制左侧分类导航显示/隐藏
+            const dockCategories = document.getElementById('dockCategories');
+            if (dockCategories) {
+                dockCategories.style.display = nav === 'home' ? 'flex' : 'none';
+            }
+            
+            // 滚动到顶部
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+            
+            showToast('切换到: ' + getNavName(nav));
+        }
+
+        function getNavName(nav) {
+            const names = {
+                'home': '首页',
+                'discover': '发现',
+                'vip': '会员',
+                'profile': '我的'
+            };
+            return names[nav] || nav;
+        }
+
+        // 主题切换
+        function setTheme(theme, element) {
+            currentTheme = theme;
+            document.documentElement.setAttribute('data-theme', theme);
+            localStorage.setItem('theme', theme);
+            
+            document.querySelectorAll('.theme-btn').forEach(btn => btn.classList.remove('active'));
+            if (element) element.classList.add('active');
+        }
+
+        // 播放视频
+        function playVideo(id) {
+            const video = allVideos.find(v => v.id === id);
+            if (!video) return;
+            
+            document.getElementById('playerModal').classList.add('active');
+            
+            if (dp) dp.destroy();
+            
+            dp = new DPlayer({
+                container: document.getElementById('dplayer'),
+                video: {
+                    url: 'http://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4',
+                    pic: video.cover
+                },
+                autoplay: true,
+                theme: '#00be06'
+            });
+        }
+
+        function closePlayer() {
+            document.getElementById('playerModal').classList.remove('active');
+            if (dp) {
+                dp.destroy();
+                dp = null;
+            }
+        }
+
+        // Toast
+        function showToast(msg) {
             const toast = document.getElementById('toast');
-            const icon = document.getElementById('toastIcon');
-            const msg = document.getElementById('toastMessage');
-            
-            msg.textContent = message;
-            icon.className = type === 'error' ? 'fas fa-exclamation-circle text-red-400' : 'fas fa-check-circle text-green-400';
-            
+            toast.textContent = msg;
             toast.classList.add('show');
             setTimeout(() => toast.classList.remove('show'), 3000);
         }
 
-        // ========== 初始化 ==========
-        window.onload = function() {
-            const saved = localStorage.getItem('gdx_app_user');
-            if (saved) {
-                currentUser = JSON.parse(saved);
-                updateUIForLoggedInUser();
-            }
-            
-            loadVideos();
-            updateHistoryCount();
-
-            // 监听视频数据变化
-            window.addEventListener('storage', function(e) {
-                if (e.key === 'gdx_videos') {
-                    console.log('检测到新视频，刷新列表');
-                    loadVideos();
-                    showToast('视频列表已更新');
-                }
-            });
-        };
-
-        // 页面可见时刷新
-        document.addEventListener('visibilitychange', function() {
-            if (!document.hidden) {
-                loadVideos();
-            }
-        });
+        // 启动
+        window.onload = init;
     </script>
+
 </body>
 </html>
