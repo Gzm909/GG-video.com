@@ -80,115 +80,63 @@
             transition: all 0.3s;
         }
         
-        /* 顶部横向导航 - GDX + 导航项 */
-        .dock-top {
+        /* 顶部 Logo */
+        .dock-logo-container {
             height: 56px;
             border-bottom: 1px solid var(--border);
             display: flex;
-            flex-direction: row;
             align-items: center;
-            padding: 0 12px;
-            gap: 16px;
+            justify-content: center;
+            flex-shrink: 0;
         }
         
         .dock-logo {
-            font-size: 18px;
+            font-size: 24px;
             font-weight: 900;
             color: var(--primary);
-            margin-right: 8px;
         }
         
-        .dock-top-item {
+        /* 中部垂直导航 - 首页/发现/会员/我的 - 垂直居中 */
+        .dock-nav {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: stretch;
+            padding: 0 12px;
+            gap: 20px;
+        }
+        
+        .dock-nav-item {
             display: flex;
             flex-direction: row;
             align-items: center;
-            gap: 6px;
-            color: var(--text-secondary);
-            font-size: 14px;
-            cursor: pointer;
-            transition: all 0.2s;
-            padding: 4px 8px;
-            border-radius: 6px;
-        }
-        
-        .dock-top-item:hover, .dock-top-item.active {
-            color: var(--primary);
-            background: rgba(0,190,6,0.1);
-        }
-        
-        .dock-top-item i {
-            font-size: 14px;
-        }
-        
-        /* 中部垂直分类 */
-        .dock-categories {
-            flex: 1;
-            padding: 16px 12px;
-            display: flex;
-            flex-direction: column;
-            gap: 4px;
-            overflow-y: auto;
-        }
-        
-        .dock-cat-item {
-            padding: 12px 16px;
-            border-radius: 12px;
+            gap: 10px;
             color: var(--text-secondary);
             font-size: 14px;
             font-weight: 500;
             cursor: pointer;
             transition: all 0.2s;
-            position: relative;
+            padding: 12px 16px;
+            border-radius: 12px;
         }
         
-        .dock-cat-item:hover {
-            color: var(--text-primary);
-            background: rgba(255,255,255,0.05);
-        }
-        
-        .dock-cat-item.active {
+        .dock-nav-item:hover, .dock-nav-item.active {
             color: var(--primary);
             background: rgba(0,190,6,0.1);
         }
         
-        .dock-cat-item.active::before {
-            content: '';
-            position: absolute;
-            left: 0;
-            top: 50%;
-            transform: translateY(-50%);
-            width: 3px;
-            height: 20px;
-            background: var(--primary);
-            border-radius: 0 3px 3px 0;
+        .dock-nav-item i {
+            font-size: 16px;
+            width: 20px;
+            text-align: center;
         }
         
-        /* 底部主题切换 - 竖向圆形按钮 */
+        /* 底部留白 */
         .dock-bottom {
-            padding: 16px;
+            height: 56px;
             border-top: 1px solid var(--border);
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            gap: 12px;
-        }
-        
-        .theme-btn {
-            width: 32px;
-            height: 32px;
-            border-radius: 50%;
-            border: 2px solid var(--border);
-            cursor: pointer;
-            transition: all 0.2s;
-        }
-        
-        .theme-btn:hover {
-            transform: scale(1.1);
-        }
-        
-        .theme-btn.active {
-            border-color: var(--primary);
-            box-shadow: 0 0 0 2px var(--primary);
+            flex-shrink: 0;
         }
         
         /* ==================== 主内容区 ==================== */
@@ -197,7 +145,7 @@
             min-height: 100vh;
         }
         
-        /* 顶部固定栏 - 修复：使用CSS变量支持主题切换 */
+        /* 顶部固定栏 */
         .top-bar {
             position: fixed;
             top: 0;
@@ -213,6 +161,247 @@
             justify-content: space-between;
             padding: 0 24px;
             transition: background-color 0.3s, border-color 0.3s;
+        }
+        
+        /* 顶部左侧 - 分类标签 */
+        .top-bar-left {
+            display: flex;
+            align-items: center;
+            gap: 16px;
+            flex: 1;
+        }
+        
+        /* 分类标签 */
+        .category-tabs {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            overflow-x: auto;
+            no-scrollbar;
+        }
+        
+        .category-tab {
+            padding: 8px 16px;
+            color: var(--text-secondary);
+            font-size: 14px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.2s;
+            border-radius: 8px;
+            white-space: nowrap;
+        }
+        
+        .category-tab:hover, .category-tab.active {
+            color: var(--primary);
+            background: rgba(0,190,6,0.1);
+        }
+        
+        /* 顶部右侧 - 搜索 + 头像 */
+        .top-bar-right {
+            display: flex;
+            align-items: center;
+            gap: 16px;
+        }
+        
+        /* 搜索框 */
+        .search-box {
+            position: relative;
+            width: 200px;
+        }
+        
+        .search-box input {
+            width: 100%;
+            height: 36px;
+            background: var(--elevated);
+            border: 1px solid var(--border);
+            border-radius: 18px;
+            padding: 0 36px 0 16px;
+            color: var(--text-primary);
+            font-size: 14px;
+            outline: none;
+            transition: all 0.3s;
+        }
+        
+        .search-box input:focus {
+            border-color: var(--primary);
+            background: var(--surface);
+        }
+        
+        .search-box input::placeholder {
+            color: var(--text-secondary);
+        }
+        
+        .search-box i {
+            position: absolute;
+            right: 12px;
+            top: 50%;
+            transform: translateY(-50%);
+            color: var(--text-secondary);
+            font-size: 14px;
+        }
+        
+        /* 搜索结果下拉 */
+        .search-results {
+            position: absolute;
+            top: 44px;
+            left: 0;
+            right: 0;
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            max-height: 300px;
+            overflow-y: auto;
+            opacity: 0;
+            visibility: hidden;
+            transform: translateY(-10px);
+            transition: all 0.3s;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.3);
+            z-index: 1000;
+        }
+        
+        .search-results.show {
+            opacity: 1;
+            visibility: visible;
+            transform: translateY(0);
+        }
+        
+        .search-result-item {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 12px 16px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        
+        .search-result-item:hover {
+            background: var(--elevated);
+        }
+        
+        .search-result-item img {
+            width: 60px;
+            height: 34px;
+            border-radius: 4px;
+            object-fit: cover;
+        }
+        
+        .search-result-item .info {
+            flex: 1;
+        }
+        
+        .search-result-item .title {
+            font-size: 14px;
+            font-weight: 500;
+            margin-bottom: 2px;
+        }
+        
+        .search-result-item .meta {
+            font-size: 12px;
+            color: var(--text-secondary);
+        }
+        
+        .search-result-item .rating {
+            color: #FFD700;
+            font-size: 12px;
+            font-weight: 600;
+        }
+        
+        .avatar-btn {
+            width: 36px;
+            height: 36px;
+            border-radius: 50%;
+            background: linear-gradient(135deg, var(--primary), #00a806);
+            border: none;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-weight: 700;
+            font-size: 14px;
+            transition: transform 0.2s;
+            position: relative;
+        }
+        
+        .avatar-btn:hover {
+            transform: scale(1.05);
+        }
+        
+        /* 头像下拉菜单 */
+        .avatar-dropdown {
+            position: absolute;
+            top: 48px;
+            right: 0;
+            width: 200px;
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 8px;
+            opacity: 0;
+            visibility: hidden;
+            transform: translateY(-10px);
+            transition: all 0.3s;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.3);
+            z-index: 1000;
+        }
+        
+        .avatar-dropdown.show {
+            opacity: 1;
+            visibility: visible;
+            transform: translateY(0);
+        }
+        
+        .dropdown-item {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 12px 16px;
+            color: var(--text-primary);
+            font-size: 14px;
+            cursor: pointer;
+            border-radius: 8px;
+            transition: all 0.2s;
+        }
+        
+        .dropdown-item:hover {
+            background: var(--elevated);
+        }
+        
+        .dropdown-divider {
+            height: 1px;
+            background: var(--border);
+            margin: 8px 0;
+        }
+        
+        .dropdown-section-title {
+            padding: 8px 16px;
+            color: var(--text-secondary);
+            font-size: 12px;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+        
+        .theme-option {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        
+        .theme-dot {
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            border: 2px solid var(--border);
+        }
+        
+        .theme-dot.dark { background: #0a0a0f; }
+        .theme-dot.light { background: #f3f4f6; }
+        .theme-dot.pink { background: #fce7f3; }
+        
+        .theme-option.active .theme-dot {
+            border-color: var(--primary);
+            box-shadow: 0 0 0 2px var(--primary);
         }
         
         /* ==================== 正在热播 - 横向大卡片轮播 ==================== */
@@ -478,62 +667,99 @@
         let currentPage = 'home';
         let carouselInterval = null;
         let currentCarouselIndex = 0;
+        let isCarouselRunning = false; // 新增：严格标记轮播运行状态
     </script>
 
     <!-- ==================== 左侧 Dock 栏（120px） ==================== -->
     <nav class="side-dock">
-        <!-- 顶部横向导航 - GDX + 导航项 -->
-        <div class="dock-top">
+        <!-- 顶部 Logo -->
+        <div class="dock-logo-container">
             <span class="dock-logo">GDX</span>
-            <div class="dock-top-item active" onclick="switchTopNav('home', this)">
+        </div>
+        
+        <!-- 中部垂直导航 - 首页/发现/会员/我的 - 垂直居中 -->
+        <div class="dock-nav">
+            <div class="dock-nav-item active" onclick="switchTopNav('home', this)">
                 <i class="fas fa-home"></i>
                 <span>首页</span>
             </div>
-            <div class="dock-top-item" onclick="switchTopNav('discover', this)">
+            <div class="dock-nav-item" onclick="switchTopNav('discover', this)">
                 <i class="fas fa-compass"></i>
                 <span>发现</span>
             </div>
-            <div class="dock-top-item" onclick="switchTopNav('vip', this)">
+            <div class="dock-nav-item" onclick="switchTopNav('vip', this)">
                 <i class="fas fa-crown"></i>
                 <span>会员</span>
             </div>
-            <div class="dock-top-item" onclick="switchTopNav('profile', this)">
+            <div class="dock-nav-item" onclick="switchTopNav('profile', this)">
                 <i class="fas fa-user"></i>
                 <span>我的</span>
             </div>
         </div>
         
-        <!-- 中部垂直分类 -->
-        <div class="dock-categories" id="dockCategories">
-            <div class="dock-cat-item active" onclick="scrollToSection('hot', this)">正在热播</div>
-            <div class="dock-cat-item" onclick="scrollToSection('recommend', this)">推荐</div>
-            <div class="dock-cat-item" onclick="scrollToSection('movie', this)">电影</div>
-            <div class="dock-cat-item" onclick="scrollToSection('tv', this)">电视剧</div>
-            <div class="dock-cat-item" onclick="scrollToSection('variety', this)">综艺</div>
-            <div class="dock-cat-item" onclick="scrollToSection('anime', this)">动漫</div>
-            <div class="dock-cat-item" onclick="scrollToSection('documentary', this)">纪录片</div>
-        </div>
-        
-        <!-- 底部主题切换 - 竖向圆形按钮 -->
-        <div class="dock-bottom">
-            <button class="theme-btn bg-gray-900 active" onclick="setTheme('dark', this)" title="暗黑模式"></button>
-            <button class="theme-btn bg-gray-100" onclick="setTheme('light', this)" title="明亮模式"></button>
-            <button class="theme-btn bg-pink-200" onclick="setTheme('pink', this)" title="粉色模式"></button>
-        </div>
+        <!-- 底部留白 -->
+        <div class="dock-bottom"></div>
     </nav>
 
     <!-- ==================== 顶部栏 ==================== -->
     <header class="top-bar">
-        <div class="flex items-center gap-4">
-            <!-- 已删除白色GDX -->
+        <!-- 左侧：分类标签 -->
+        <div class="top-bar-left">
+            <div class="category-tabs no-scrollbar" id="categoryTabs">
+                <div class="category-tab active" onclick="scrollToSection('hot', this)">正在热播</div>
+                <div class="category-tab" onclick="scrollToSection('recommend', this)">推荐</div>
+                <div class="category-tab" onclick="scrollToSection('movie', this)">电影</div>
+                <div class="category-tab" onclick="scrollToSection('tv', this)">电视剧</div>
+                <div class="category-tab" onclick="scrollToSection('variety', this)">综艺</div>
+                <div class="category-tab" onclick="scrollToSection('anime', this)">动漫</div>
+                <div class="category-tab" onclick="scrollToSection('documentary', this)">纪录片</div>
+            </div>
         </div>
-        <div class="flex items-center gap-4">
-            <button class="w-10 h-10 rounded-full bg-white/10 flex items-center justify-center hover:bg-white/20 transition-colors">
+        
+        <!-- 右侧：搜索 + 头像 -->
+        <div class="top-bar-right">
+            <!-- 搜索框 -->
+            <div class="search-box" id="searchBox">
+                <input type="text" placeholder="搜索视频、电影、电视剧..." id="searchInput">
                 <i class="fas fa-search"></i>
-            </button>
-            <button class="w-10 h-10 rounded-full bg-gradient-to-br from-green-400 to-green-600 flex items-center justify-center text-sm font-bold">
-                G
-            </button>
+                <!-- 搜索结果下拉 -->
+                <div class="search-results" id="searchResults"></div>
+            </div>
+            
+            <!-- 头像按钮 -->
+            <button class="avatar-btn" onclick="toggleAvatarDropdown()">G</button>
+            
+            <!-- 头像下拉菜单 -->
+            <div class="avatar-dropdown" id="avatarDropdown">
+                <div class="dropdown-section-title">主题设置</div>
+                <div class="dropdown-item theme-option active" onclick="setThemeFromDropdown('dark', this)">
+                    <div class="theme-dot dark"></div>
+                    <span>暗黑模式</span>
+                </div>
+                <div class="dropdown-item theme-option" onclick="setThemeFromDropdown('light', this)">
+                    <div class="theme-dot light"></div>
+                    <span>明亮模式</span>
+                </div>
+                <div class="dropdown-item theme-option" onclick="setThemeFromDropdown('pink', this)">
+                    <div class="theme-dot pink"></div>
+                    <span>粉色模式</span>
+                </div>
+                
+                <div class="dropdown-divider"></div>
+                
+                <div class="dropdown-item" onclick="switchTopNav('profile', document.querySelector('.dock-nav-item[onclick*=profile]'))">
+                    <i class="fas fa-user-circle"></i>
+                    <span>个人中心</span>
+                </div>
+                <div class="dropdown-item">
+                    <i class="fas fa-cog"></i>
+                    <span>设置</span>
+                </div>
+                <div class="dropdown-item">
+                    <i class="fas fa-sign-out-alt"></i>
+                    <span>退出登录</span>
+                </div>
+            </div>
         </div>
     </header>
 
@@ -727,13 +953,88 @@
         function init() {
             // 读取保存的主题
             const savedTheme = localStorage.getItem('theme') || 'dark';
-            setTheme(savedTheme, document.querySelector(`.theme-btn[onclick*="${savedTheme}"]`));
+            setTheme(savedTheme);
+            updateDropdownThemeUI(savedTheme);
             
             renderHotSection();
             renderCategorySections();
             renderDiscoverPage();
             renderVipPage();
             setupScrollSpy();
+            setupSearch();
+            
+            // 点击外部关闭下拉菜单
+            document.addEventListener('click', (e) => {
+                const dropdown = document.getElementById('avatarDropdown');
+                const searchResults = document.getElementById('searchResults');
+                const avatarBtn = document.querySelector('.avatar-btn');
+                const searchBox = document.getElementById('searchBox');
+                
+                if (!dropdown.contains(e.target) && !avatarBtn.contains(e.target)) {
+                    dropdown.classList.remove('show');
+                }
+                if (!searchBox.contains(e.target)) {
+                    searchResults.classList.remove('show');
+                }
+            });
+        }
+
+        // 设置搜索功能
+        function setupSearch() {
+            const searchInput = document.getElementById('searchInput');
+            const searchResults = document.getElementById('searchResults');
+            
+            searchInput.addEventListener('input', (e) => {
+                const keyword = e.target.value.trim().toLowerCase();
+                
+                if (keyword === '') {
+                    searchResults.classList.remove('show');
+                    return;
+                }
+                
+                // 搜索过滤
+                const results = allVideos.filter(v => 
+                    v.title.toLowerCase().includes(keyword)
+                ).slice(0, 5);
+                
+                if (results.length === 0) {
+                    searchResults.innerHTML = '<div class="search-result-item"><span style="color: var(--text-secondary)">未找到相关视频</span></div>';
+                } else {
+                    searchResults.innerHTML = results.map(v => `
+                        <div class="search-result-item" onclick="playVideo(${v.id}); document.getElementById('searchResults').classList.remove('show');">
+                            <img src="${v.cover}" alt="${v.title}">
+                            <div class="info">
+                                <div class="title">${v.title}</div>
+                                <div class="meta">${getCategoryName(v.category)} · ${(v.views / 10000).toFixed(1)}万次播放</div>
+                            </div>
+                            <div class="rating"><i class="fas fa-star"></i> ${v.rating}</div>
+                        </div>
+                    `).join('');
+                }
+                
+                searchResults.classList.add('show');
+            });
+            
+            // 回车键搜索
+            searchInput.addEventListener('keyup', (e) => {
+                if (e.key === 'Enter') {
+                    const keyword = e.target.value.trim().toLowerCase();
+                    if (keyword) {
+                        showToast('搜索: ' + keyword);
+                    }
+                }
+            });
+        }
+
+        function getCategoryName(cat) {
+            const names = {
+                'movie': '电影',
+                'tv': '电视剧',
+                'variety': '综艺',
+                'anime': '动漫',
+                'documentary': '纪录片'
+            };
+            return names[cat] || cat;
         }
 
         // 渲染正在热播（横向大卡片轮播）
@@ -764,8 +1065,10 @@
                 <div class="carousel-dot ${index === 0 ? 'active' : ''}" onclick="goToCarouselSlide(${index})"></div>
             `).join('');
             
-            // 启动自动轮播
-            startCarousel();
+            // 启动自动轮播 - 只在首页启动
+            if (currentPage === 'home') {
+                startCarousel();
+            }
             
             // 监听滚动更新指示器
             container.addEventListener('scroll', updateCarouselIndicator);
@@ -773,38 +1076,82 @@
 
         // 启动自动轮播
         function startCarousel() {
-            if (carouselInterval) clearInterval(carouselInterval);
+            // 严格停止已有定时器
+            stopCarousel();
+            
+            // 双重检查：只有首页才启动
+            if (currentPage !== 'home') {
+                console.log('不在首页，拒绝启动轮播');
+                return;
+            }
+            
+            isCarouselRunning = true;
+            console.log('启动轮播');
+            
             carouselInterval = setInterval(() => {
+                // 严格检查：只有首页且标记为运行中才执行
+                if (currentPage !== 'home' || !isCarouselRunning) {
+                    console.log('轮播条件不满足，跳过执行');
+                    return;
+                }
+                
                 const container = document.getElementById('hotContainer');
+                if (!container) {
+                    console.log('容器不存在，停止轮播');
+                    stopCarousel();
+                    return;
+                }
+                
                 const nextIndex = (currentCarouselIndex + 1) % hotVideos.length;
+                console.log('轮播跳转到:', nextIndex);
                 goToCarouselSlide(nextIndex);
             }, 5000);
         }
 
+        // 停止轮播 - 严格清除
+        function stopCarousel() {
+            console.log('停止轮播');
+            isCarouselRunning = false;
+            if (carouselInterval) {
+                clearInterval(carouselInterval);
+                carouselInterval = null;
+            }
+        }
+
         // 跳转到指定轮播项
         function goToCarouselSlide(index) {
-            const container = document.getElementById('hotContainer');
-            const cards = container.querySelectorAll('.hot-card');
-            if (cards[index]) {
-                cards[index].scrollIntoView({ behavior: 'smooth', inline: 'start', block: 'nearest' });
-                currentCarouselIndex = index;
-                updateCarouselIndicator();
+            // 严格检查：只有首页才执行
+            if (currentPage !== 'home') {
+                console.log('不在首页，拒绝滚动');
+                return;
             }
+            
+            const container = document.getElementById('hotContainer');
+            if (!container) {
+                console.log('容器不存在');
+                return;
+            }
+            
+            const cards = container.querySelectorAll('.hot-card');
+            if (!cards[index]) {
+                console.log('卡片不存在');
+                return;
+            }
+            
+            console.log('执行滚动到:', index);
+            
+            // 使用更安全的滚动方式
+            const card = cards[index];
+            const scrollLeft = card.offsetLeft - container.offsetLeft;
+            container.scrollTo({ left: scrollLeft, behavior: 'smooth' });
+            
+            currentCarouselIndex = index;
+            updateCarouselIndicator();
         }
 
         // 更新轮播指示器
         function updateCarouselIndicator() {
-            const container = document.getElementById('hotContainer');
             const dots = document.querySelectorAll('.carousel-dot');
-            const cards = container.querySelectorAll('.hot-card');
-            const scrollLeft = container.scrollLeft;
-            const cardWidth = cards[0]?.offsetWidth + 24 || 664; // 卡片宽度 + gap
-            
-            const newIndex = Math.round(scrollLeft / cardWidth);
-            if (newIndex !== currentCarouselIndex && newIndex >= 0 && newIndex < hotVideos.length) {
-                currentCarouselIndex = newIndex;
-            }
-            
             dots.forEach((dot, index) => {
                 dot.classList.toggle('active', index === currentCarouselIndex);
             });
@@ -887,11 +1234,12 @@
         function scrollToSection(sectionId, element) {
             // 只在首页时启用滚动
             if (currentPage !== 'home') {
-                switchTopNav('home', document.querySelector('.dock-top-item[onclick*="home"]'));
+                switchTopNav('home', document.querySelector('.dock-nav-item[onclick*="home"]'));
             }
             
-            document.querySelectorAll('.dock-cat-item').forEach(el => el.classList.remove('active'));
-            element.classList.add('active');
+            // 更新顶部标签状态
+            document.querySelectorAll('.category-tab').forEach(el => el.classList.remove('active'));
+            if (element) element.classList.add('active');
             
             const target = document.getElementById('section-' + sectionId);
             if (target) {
@@ -899,10 +1247,10 @@
             }
         }
 
-        // 滚动监听（自动高亮左侧）
+        // 滚动监听（自动高亮顶部标签）
         function setupScrollSpy() {
             const sections = ['hot', 'recommend', 'movie', 'tv', 'variety', 'anime', 'documentary'];
-            const catItems = document.querySelectorAll('.dock-cat-item');
+            const tabs = document.querySelectorAll('.category-tab');
             
             window.addEventListener('scroll', () => {
                 if (currentPage !== 'home') return;
@@ -916,18 +1264,23 @@
                         const offsetBottom = offsetTop + element.offsetHeight;
                         
                         if (scrollPos >= offsetTop && scrollPos < offsetBottom) {
-                            catItems.forEach(el => el.classList.remove('active'));
-                            catItems[index].classList.add('active');
+                            tabs.forEach(el => el.classList.remove('active'));
+                            tabs[index].classList.add('active');
                         }
                     }
                 });
             });
         }
 
-        // 顶部导航切换 - 修复：实现页面切换逻辑
+        // 顶部导航切换
         function switchTopNav(nav, element) {
-            document.querySelectorAll('.dock-top-item').forEach(el => el.classList.remove('active'));
+            console.log('切换页面到:', nav);
+            
+            document.querySelectorAll('.dock-nav-item').forEach(el => el.classList.remove('active'));
             element.classList.add('active');
+            
+            // 严格停止轮播
+            stopCarousel();
             
             currentPage = nav;
             
@@ -942,16 +1295,34 @@
                 targetPage.classList.add('active');
             }
             
-            // 控制左侧分类导航显示/隐藏
-            const dockCategories = document.getElementById('dockCategories');
-            if (dockCategories) {
-                dockCategories.style.display = nav === 'home' ? 'flex' : 'none';
+            // 控制顶部分类标签和搜索显示/隐藏
+            const categoryTabs = document.getElementById('categoryTabs');
+            const searchBox = document.getElementById('searchBox');
+            if (categoryTabs) {
+                categoryTabs.style.display = nav === 'home' ? 'flex' : 'none';
+            }
+            if (searchBox) {
+                searchBox.style.display = nav === 'home' ? 'block' : 'none';
+            }
+            
+            // 轮播控制：只有首页才启动
+            if (nav === 'home') {
+                console.log('回到首页，准备启动轮播');
+                // 延迟启动，确保页面渲染完成
+                setTimeout(() => {
+                    if (currentPage === 'home') {
+                        startCarousel();
+                    }
+                }, 100);
             }
             
             // 滚动到顶部
             window.scrollTo({ top: 0, behavior: 'smooth' });
             
             showToast('切换到: ' + getNavName(nav));
+            
+            // 关闭下拉菜单
+            document.getElementById('avatarDropdown').classList.remove('show');
         }
 
         function getNavName(nav) {
@@ -964,14 +1335,39 @@
             return names[nav] || nav;
         }
 
+        // 切换头像下拉菜单
+        function toggleAvatarDropdown() {
+            const dropdown = document.getElementById('avatarDropdown');
+            dropdown.classList.toggle('show');
+        }
+
+        // 从下拉菜单设置主题
+        function setThemeFromDropdown(theme, element) {
+            setTheme(theme);
+            updateDropdownThemeUI(theme);
+            showToast('已切换到' + getThemeName(theme));
+        }
+
+        function updateDropdownThemeUI(theme) {
+            document.querySelectorAll('.theme-option').forEach(el => el.classList.remove('active'));
+            const activeOption = document.querySelector(`.theme-option[onclick*="${theme}"]`);
+            if (activeOption) activeOption.classList.add('active');
+        }
+
+        function getThemeName(theme) {
+            const names = {
+                'dark': '暗黑模式',
+                'light': '明亮模式',
+                'pink': '粉色模式'
+            };
+            return names[theme] || theme;
+        }
+
         // 主题切换
-        function setTheme(theme, element) {
+        function setTheme(theme) {
             currentTheme = theme;
             document.documentElement.setAttribute('data-theme', theme);
             localStorage.setItem('theme', theme);
-            
-            document.querySelectorAll('.theme-btn').forEach(btn => btn.classList.remove('active'));
-            if (element) element.classList.add('active');
         }
 
         // 播放视频
