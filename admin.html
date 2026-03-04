@@ -39,14 +39,1244 @@
 </head>
 <body class="bg-gradient-to-br from-gray-900 via-blue-900 to-gray-900 min-h-screen text-white">
 
-    <!-- API配置 - 固定服务器地址 -->
+    <!-- ==================== 配置层 ==================== -->
     <script>
-        // 固定指向你的后端服务器
-        const API_BASE = 'http://192.168.3.22:3000';
-        
-        console.log('API地址:', API_BASE);
+        /**
+         * config.js - 全局配置
+         * 迁移到阿里云时只需修改此处
+         */
+        const config = {
+            // API基础地址
+            API_BASE: 'http://47.98.254.208:3000',
+            
+            // 存储模式: 'local' | 'cloud'
+            STORAGE_MODE: 'local',
+            
+            // 阿里云OSS配置（后续启用）
+            OSS_BASE: '',
+            
+            // 超级管理员账号
+            SUPER_ADMIN: {
+                username: 'GDX',
+                password: '666'
+            },
+            
+            // 上传限制
+            UPLOAD_LIMITS: {
+                coverMaxSize: 5 * 1024 * 1024,      // 5MB
+                videoMaxSize: 500 * 1024 * 1024,    // 500MB
+                allowedVideoTypes: ['video/mp4', 'video/webm', 'video/quicktime']
+            }
+        };
     </script>
 
+    <!-- ==================== 工具层 ==================== -->
+    <script>
+        /**
+         * utils/helpers.js - 通用工具函数
+         */
+        const utils = {
+            // 安全获取localStorage
+            safeGet(key, defaultValue = null) {
+                try {
+                    const data = localStorage.getItem(key);
+                    return data ? JSON.parse(data) : defaultValue;
+                } catch (e) {
+                    console.error(`safeGet error for key ${key}:`, e);
+                    return defaultValue;
+                }
+            },
+
+            // 安全设置localStorage
+            safeSet(key, value) {
+                try {
+                    localStorage.setItem(key, JSON.stringify(value));
+                    return true;
+                } catch (e) {
+                    console.error(`safeSet error for key ${key}:`, e);
+                    alert('保存失败：存储空间不足');
+                    return false;
+                }
+            },
+
+            // 格式化文件大小
+            formatSize(bytes) {
+                if (!bytes) return '0 B';
+                const units = ['B', 'KB', 'MB', 'GB'];
+                const i = Math.floor(Math.log(bytes) / Math.log(1024));
+                return (bytes / Math.pow(1024, i)).toFixed(1) + ' ' + units[i];
+            },
+
+            // 生成唯一ID
+            generateId() {
+                return Date.now() + Math.random().toString(36).substr(2, 9);
+            },
+
+            // 深拷贝
+            deepClone(obj) {
+                return JSON.parse(JSON.stringify(obj));
+            },
+
+            // 防抖函数
+            debounce(fn, delay = 300) {
+                let timer = null;
+                return function(...args) {
+                    clearTimeout(timer);
+                    timer = setTimeout(() => fn.apply(this, args), delay);
+                };
+            },
+
+            // 显示Toast提示
+            showToast(message, type = 'success') {
+                const toast = document.createElement('div');
+                const icon = type === 'success' ? 'fa-check-circle' : 'fa-exclamation-circle';
+                const colorClass = type === 'success' ? 'bg-green-500' : 'bg-red-500';
+                
+                toast.className = `fixed top-20 left-1/2 transform -translate-x-1/2 ${colorClass} text-white px-6 py-3 rounded-full shadow-lg z-[100] text-sm flex items-center gap-2`;
+                toast.innerHTML = `<i class="fas ${icon}"></i><span>${message}</span>`;
+                
+                document.body.appendChild(toast);
+                setTimeout(() => {
+                    toast.style.opacity = '0';
+                    toast.style.transition = 'opacity 0.3s';
+                    setTimeout(() => toast.remove(), 300);
+                }, 3000);
+            },
+
+            // 确认对话框
+            confirm(message) {
+                return window.confirm(message);
+            },
+
+            // 检查是否为HLS视频
+            isHLS(url) {
+                return url && (url.endsWith('.m3u8') || url.includes('.m3u8'));
+            }
+        };
+    </script>
+
+    <!-- ==================== 存储抽象层 ==================== -->
+    <script>
+        /**
+         * storage.js - 存储抽象层
+         * 支持 localStorage 和 云端存储 两种模式
+         */
+        const storage = {
+            // 获取数据
+            async get(key, defaultValue = null) {
+                if (config.STORAGE_MODE === 'local') {
+                    return utils.safeGet(key, defaultValue);
+                } else {
+                    // 云端模式
+                    try {
+                        const response = await fetch(`${config.API_BASE}/data/${key}`);
+                        if (!response.ok) throw new Error('Network error');
+                        return await response.json();
+                    } catch (e) {
+                        console.error('Cloud storage get error:', e);
+                        return defaultValue;
+                    }
+                }
+            },
+
+            // 设置数据
+            async set(key, value) {
+                if (config.STORAGE_MODE === 'local') {
+                    return utils.safeSet(key, value);
+                } else {
+                    // 云端模式
+                    try {
+                        const response = await fetch(`${config.API_BASE}/data/${key}`, {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify(value)
+                        });
+                        return response.ok;
+                    } catch (e) {
+                        console.error('Cloud storage set error:', e);
+                        return false;
+                    }
+                }
+            },
+
+            // 删除数据
+            async remove(key) {
+                if (config.STORAGE_MODE === 'local') {
+                    localStorage.removeItem(key);
+                    return true;
+                } else {
+                    try {
+                        const response = await fetch(`${config.API_BASE}/data/${key}`, {
+                            method: 'DELETE'
+                        });
+                        return response.ok;
+                    } catch (e) {
+                        console.error('Cloud storage remove error:', e);
+                        return false;
+                    }
+                }
+            },
+
+            // 批量获取
+            async getMultiple(keys) {
+                const result = {};
+                for (const key of keys) {
+                    result[key] = await this.get(key);
+                }
+                return result;
+            }
+        };
+    </script>
+
+    <!-- ==================== 用户服务层 ==================== -->
+    <script>
+        /**
+         * services/userService.js - 用户管理服务
+         * 职责：用户CRUD、VIP状态管理、用户统计
+         */
+        const userService = {
+            // 存储键名
+            STORAGE_KEY: 'gdx_users',
+            
+            // 初始化默认用户数据
+            defaultUsers: [
+                { id: 1, username: 'user001', password: '123456', isVip: true, createdAt: new Date().toISOString() },
+                { id: 2, username: 'test', password: 'test123', isVip: false, createdAt: new Date().toISOString() }
+            ],
+
+            // 获取所有用户
+            async getAllUsers() {
+                const users = await storage.get(this.STORAGE_KEY, this.defaultUsers);
+                return Array.isArray(users) ? users : this.defaultUsers;
+            },
+
+            // 根据ID获取用户
+            async getUserById(id) {
+                const users = await this.getAllUsers();
+                return users.find(u => u.id === id) || null;
+            },
+
+            // 根据用户名获取用户
+            async getUserByUsername(username) {
+                const users = await this.getAllUsers();
+                return users.find(u => u.username === username) || null;
+            },
+
+            // 创建用户
+            async createUser(userData) {
+                const users = await this.getAllUsers();
+                
+                // 检查用户名是否已存在
+                if (users.some(u => u.username === userData.username)) {
+                    throw new Error('用户名已存在');
+                }
+
+                const newUser = {
+                    id: users.length > 0 ? Math.max(...users.map(u => u.id)) + 1 : 1,
+                    username: userData.username,
+                    password: userData.password,
+                    isVip: userData.isVip || false,
+                    createdAt: new Date().toISOString()
+                };
+
+                users.push(newUser);
+                await storage.set(this.STORAGE_KEY, users);
+                return newUser;
+            },
+
+            // 更新用户
+            async updateUser(id, updates) {
+                const users = await this.getAllUsers();
+                const index = users.findIndex(u => u.id === id);
+                
+                if (index === -1) {
+                    throw new Error('用户不存在');
+                }
+
+                // 如果修改用户名，检查是否与其他用户冲突
+                if (updates.username && updates.username !== users[index].username) {
+                    if (users.some(u => u.username === updates.username && u.id !== id)) {
+                        throw new Error('用户名已存在');
+                    }
+                }
+
+                users[index] = { ...users[index], ...updates };
+                await storage.set(this.STORAGE_KEY, users);
+                return users[index];
+            },
+
+            // 删除用户
+            async deleteUser(id) {
+                const users = await this.getAllUsers();
+                const filtered = users.filter(u => u.id !== id);
+                
+                if (filtered.length === users.length) {
+                    throw new Error('用户不存在');
+                }
+
+                await storage.set(this.STORAGE_KEY, filtered);
+                return true;
+            },
+
+            // 切换VIP状态
+            async toggleVipStatus(id) {
+                const user = await this.getUserById(id);
+                if (!user) throw new Error('用户不存在');
+                
+                return await this.updateUser(id, { isVip: !user.isVip });
+            },
+
+            // 验证用户密码（用于登录）
+            async validateUser(username, password) {
+                const user = await this.getUserByUsername(username);
+                if (!user) return null;
+                if (user.password !== password) return null;
+                return user;
+            },
+
+            // 获取统计数据
+            async getStatistics() {
+                const users = await this.getAllUsers();
+                const now = new Date();
+                const today = now.toISOString().split('T')[0];
+                
+                return {
+                    total: users.length,
+                    vipCount: users.filter(u => u.isVip).length,
+                    normalCount: users.filter(u => !u.isVip).length,
+                    todayNew: users.filter(u => {
+                        const userDate = u.createdAt ? u.createdAt.split('T')[0] : '';
+                        return userDate === today;
+                    }).length
+                };
+            },
+
+            // 重置为默认数据（调试使用）
+            async resetToDefault() {
+                await storage.set(this.STORAGE_KEY, this.defaultUsers);
+                return this.defaultUsers;
+            }
+        };
+    </script>
+
+    <!-- ==================== 视频服务层 ==================== -->
+    <script>
+        /**
+         * services/videoService.js - 视频管理服务（查询部分）
+         * 职责：视频CRUD、分类筛选、视频统计
+         */
+        const videoService = {
+            // 视频列表缓存
+            videoCache: null,
+            cacheTime: null,
+            CACHE_DURATION: 5 * 60 * 1000, // 5分钟缓存
+
+            // 获取所有视频（支持缓存）
+            async getAllVideos(useCache = true) {
+                // 检查缓存
+                if (useCache && this.videoCache && this.cacheTime) {
+                    if (Date.now() - this.cacheTime < this.CACHE_DURATION) {
+                        return this.videoCache;
+                    }
+                }
+
+                try {
+                    const response = await fetch(`${config.API_BASE}/api/videos`);
+                    const result = await response.json();
+                    
+                    if (result.success) {
+                        this.videoCache = result.videos || [];
+                        this.cacheTime = Date.now();
+                        return this.videoCache;
+                    }
+                    throw new Error(result.message || '获取视频失败');
+                } catch (error) {
+                    console.error('获取视频列表失败:', error);
+                    return [];
+                }
+            },
+
+            // 根据ID获取视频
+            async getVideoById(id) {
+                const videos = await this.getAllVideos();
+                return videos.find(v => v.id === id) || null;
+            },
+
+            // 按分类获取视频
+            async getVideosByCategory(category) {
+                const videos = await this.getAllVideos();
+                if (category === 'all') return videos;
+                return videos.filter(v => v.category === category);
+            },
+
+            // 搜索视频
+            async searchVideos(keyword) {
+                const videos = await this.getAllVideos();
+                const lowerKeyword = keyword.toLowerCase();
+                return videos.filter(v => 
+                    v.title.toLowerCase().includes(lowerKeyword) ||
+                    (v.desc && v.desc.toLowerCase().includes(lowerKeyword))
+                );
+            },
+
+            // 获取VIP视频
+            async getVipVideos() {
+                const videos = await this.getAllVideos();
+                return videos.filter(v => v.isVip);
+            },
+
+            // 获取免费视频
+            async getFreeVideos() {
+                const videos = await this.getAllVideos();
+                return videos.filter(v => !v.isVip);
+            },
+
+            // 创建视频（URL方式）
+            async createVideo(videoData) {
+                const data = {
+                    title: videoData.title,
+                    coverUrl: videoData.coverUrl,
+                    videoUrl: videoData.videoUrl,
+                    category: videoData.category || 'movie',
+                    rating: parseFloat(videoData.rating) || 8.0,
+                    desc: videoData.desc || '',
+                    isVip: videoData.isVip || false,
+                    sourceType: 'url',
+                    createdAt: new Date().toISOString()
+                };
+
+                const response = await fetch(`${config.API_BASE}/api/videos`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(data)
+                });
+
+                const result = await response.json();
+                
+                if (result.success) {
+                    // 清除缓存
+                    this.clearCache();
+                    return result;
+                }
+                throw new Error(result.message || '保存失败');
+            },
+
+            // 删除视频
+            async deleteVideo(id) {
+                const response = await fetch(`${config.API_BASE}/api/videos/${id}`, {
+                    method: 'DELETE'
+                });
+
+                const result = await response.json();
+                
+                if (result.success) {
+                    this.clearCache();
+                    return true;
+                }
+                throw new Error(result.message || '删除失败');
+            },
+
+            // 获取统计数据
+            async getStatistics() {
+                const videos = await this.getAllVideos();
+                const totalSize = videos.reduce((sum, v) => sum + (v.fileSize || 0), 0);
+                
+                return {
+                    total: videos.length,
+                    vipCount: videos.filter(v => v.isVip).length,
+                    freeCount: videos.filter(v => !v.isVip).length,
+                    storageUsed: totalSize,
+                    storageUsedFormatted: utils.formatSize(totalSize)
+                };
+            },
+
+            // 清除缓存
+            clearCache() {
+                this.videoCache = null;
+                this.cacheTime = null;
+            },
+
+            // 刷新数据
+            async refresh() {
+                this.clearCache();
+                return await this.getAllVideos(false);
+            }
+        };
+    </script>
+
+    <!-- ==================== 管理员服务层 ==================== -->
+    <script>
+        /**
+         * services/adminService.js - 管理员专属服务
+         * 职责：文件上传、系统管理、高级操作
+         */
+        const adminService = {
+            // 当前上传请求（用于取消）
+            currentUploadXHR: null,
+
+            // 验证超级管理员登录
+            validateSuperAdmin(username, password) {
+                return username === config.SUPER_ADMIN.username && 
+                       password === config.SUPER_ADMIN.password;
+            },
+
+            // 上传本地视频（带进度监控）
+            async uploadLocalVideo(formData, onProgress) {
+                return new Promise((resolve, reject) => {
+                    const xhr = new XMLHttpRequest();
+                    this.currentUploadXHR = xhr;
+
+                    // 进度监控
+                    if (onProgress && xhr.upload) {
+                        xhr.upload.addEventListener('progress', (e) => {
+                            if (e.lengthComputable) {
+                                const percent = Math.round((e.loaded / e.total) * 100);
+                                onProgress(percent, e.loaded, e.total);
+                            }
+                        });
+                    }
+
+                    xhr.addEventListener('load', () => {
+                        this.currentUploadXHR = null;
+                        
+                        if (xhr.status === 200) {
+                            try {
+                                const result = JSON.parse(xhr.responseText);
+                                if (result.success) {
+                                    // 清除视频缓存
+                                    videoService.clearCache();
+                                    resolve(result);
+                                } else {
+                                    reject(new Error(result.message || '上传失败'));
+                                }
+                            } catch (e) {
+                                reject(new Error('解析响应失败'));
+                            }
+                        } else {
+                            reject(new Error(`HTTP ${xhr.status}: ${xhr.statusText}`));
+                        }
+                    });
+
+                    xhr.addEventListener('error', () => {
+                        this.currentUploadXHR = null;
+                        reject(new Error('网络错误，请检查服务器是否运行'));
+                    });
+
+                    xhr.addEventListener('abort', () => {
+                        this.currentUploadXHR = null;
+                        reject(new Error('上传已取消'));
+                    });
+
+                    xhr.open('POST', `${config.API_BASE}/api/upload`);
+                    xhr.send(formData);
+                });
+            },
+
+            // 取消当前上传
+            cancelUpload() {
+                if (this.currentUploadXHR) {
+                    this.currentUploadXHR.abort();
+                    this.currentUploadXHR = null;
+                    return true;
+                }
+                return false;
+            },
+
+            // 批量删除视频
+            async batchDeleteVideo(ids) {
+                const results = [];
+                for (const id of ids) {
+                    try {
+                        await videoService.deleteVideo(id);
+                        results.push({ id, success: true });
+                    } catch (error) {
+                        results.push({ id, success: false, error: error.message });
+                    }
+                }
+                return results;
+            },
+
+            // 获取系统状态
+            async getSystemStatus() {
+                const [userStats, videoStats] = await Promise.all([
+                    userService.getStatistics(),
+                    videoService.getStatistics()
+                ]);
+
+                return {
+                    users: userStats,
+                    videos: videoStats,
+                    storage: {
+                        mode: config.STORAGE_MODE,
+                        apiBase: config.API_BASE
+                    },
+                    timestamp: new Date().toISOString()
+                };
+            },
+
+            // 导出所有数据（备份）
+            async exportAllData() {
+                const [users, videos] = await Promise.all([
+                    userService.getAllUsers(),
+                    videoService.getAllVideos()
+                ]);
+
+                return {
+                    users,
+                    videos,
+                    exportedAt: new Date().toISOString(),
+                    version: '1.0'
+                };
+            },
+
+            // 导入数据（恢复）
+            async importData(data) {
+                if (data.users) {
+                    await storage.set(userService.STORAGE_KEY, data.users);
+                }
+                // 视频数据通常存储在服务器，这里仅作示例
+                return true;
+            },
+
+            // 清理缓存
+            clearAllCache() {
+                videoService.clearCache();
+                // 可以添加更多缓存清理逻辑
+                return true;
+            }
+        };
+    </script>
+
+    <!-- ==================== 页面控制器 ==================== -->
+    <script>
+        /**
+         * adminController.js - 页面主控制器
+         * 协调各个服务，处理UI交互
+         */
+        const adminController = {
+            // 状态
+            state: {
+                currentPage: 'account', // 'account' | 'video'
+                selectedFiles: { cover: null, video: null },
+                players: { dp: null, previewDp: null, urlDp: null },
+                uploadMode: 'local', // 'local' | 'url'
+                currentVideo: null
+            },
+
+            // 初始化
+            async init() {
+                // 检查登录状态
+                if (localStorage.getItem('gdx_admin_logged_in') === 'true') {
+                    await this.showDashboard();
+                }
+
+                // 绑定事件
+                this.bindEvents();
+            },
+
+            // 绑定全局事件
+            bindEvents() {
+                // ESC键关闭模态框
+                document.addEventListener('keydown', (e) => {
+                    if (e.key === 'Escape') {
+                        this.closeAllModals();
+                    }
+                });
+
+                // 输入框监听
+                const titleInput = document.getElementById('localVideoTitle');
+                if (titleInput) {
+                    titleInput.addEventListener('input', () => this.checkCanUploadLocal());
+                }
+
+                // URL输入监听
+                ['urlVideoTitle', 'urlCoverInput', 'urlVideoInput'].forEach(id => {
+                    const el = document.getElementById(id);
+                    if (el) {
+                        el.addEventListener('input', () => this.checkCanSaveUrl());
+                    }
+                });
+            },
+
+            // 登录
+            async doLogin() {
+                const username = document.getElementById('username').value.trim();
+                const password = document.getElementById('password').value;
+                const errorMsg = document.getElementById('errorMsg');
+
+                if (adminService.validateSuperAdmin(username, password)) {
+                    localStorage.setItem('gdx_admin_logged_in', 'true');
+                    errorMsg.style.display = 'none';
+                    await this.showDashboard();
+                } else {
+                    errorMsg.textContent = '账号或密码错误！';
+                    errorMsg.style.display = 'block';
+                }
+            },
+
+            // 退出登录
+            doLogout() {
+                localStorage.removeItem('gdx_admin_logged_in');
+                location.reload();
+            },
+
+            // 显示管理面板
+            async showDashboard() {
+                document.getElementById('loginPage').style.display = 'none';
+                document.getElementById('dashboardPage').style.display = 'block';
+                
+                await this.renderUsers();
+                await this.loadVideos();
+            },
+
+            // 渲染用户列表
+            async renderUsers() {
+                try {
+                    const [users, stats] = await Promise.all([
+                        userService.getAllUsers(),
+                        userService.getStatistics()
+                    ]);
+
+                    // 更新统计卡片
+                    document.getElementById('totalUsers').textContent = stats.total;
+                    document.getElementById('vipUsers').textContent = stats.vipCount;
+                    document.getElementById('normalUsers').textContent = stats.normalCount;
+                    // 今日新增暂不显示具体数字
+
+                    // 渲染表格
+                    const tbody = document.getElementById('tableBody');
+                    if (users.length === 0) {
+                        tbody.innerHTML = '<tr><td colspan="5" class="px-6 py-8 text-center text-gray-500">暂无用户数据</td></tr>';
+                        return;
+                    }
+
+                    tbody.innerHTML = users.map(u => `
+                        <tr class="hover:bg-gray-800/30 transition-colors">
+                            <td class="px-6 py-4 text-gray-400">#${u.id}</td>
+                            <td class="px-6 py-4 font-medium text-white">${u.username}</td>
+                            <td class="px-6 py-4 text-gray-400">${u.password}</td>
+                            <td class="px-6 py-4">
+                                ${u.isVip 
+                                    ? '<span class="px-2 py-1 rounded-full text-xs font-bold bg-amber-500/20 text-amber-400">VIP</span>' 
+                                    : '<span class="px-2 py-1 rounded-full text-xs bg-gray-700 text-gray-400">普通</span>'}
+                            </td>
+                            <td class="px-6 py-4 text-right">
+                                <button onclick="adminController.editUser(${u.id})" class="text-blue-400 hover:text-blue-300 mr-3 transition-colors">
+                                    <i class="fas fa-edit"></i>
+                                </button>
+                                <button onclick="adminController.deleteUser(${u.id})" class="text-red-400 hover:text-red-300 transition-colors">
+                                    <i class="fas fa-trash"></i>
+                                </button>
+                            </td>
+                        </tr>
+                    `).join('');
+                } catch (error) {
+                    console.error('渲染用户列表失败:', error);
+                    utils.showToast('加载用户数据失败', 'error');
+                }
+            },
+
+            // 加载视频数据
+            async loadVideos() {
+                try {
+                    await this.renderVideos();
+                } catch (error) {
+                    console.error('加载视频失败:', error);
+                }
+            },
+
+            // 渲染视频列表
+            async renderVideos() {
+                try {
+                    const [videos, stats] = await Promise.all([
+                        videoService.getAllVideos(),
+                        videoService.getStatistics()
+                    ]);
+
+                    // 更新统计卡片
+                    document.getElementById('totalVideos').textContent = stats.total;
+                    document.getElementById('vipVideos').textContent = stats.vipCount;
+                    document.getElementById('freeVideos').textContent = stats.freeCount;
+                    document.getElementById('storageUsed').textContent = stats.storageUsedFormatted;
+
+                    // 渲染表格
+                    const tbody = document.getElementById('videoTableBody');
+                    if (videos.length === 0) {
+                        tbody.innerHTML = '<tr><td colspan="5" class="px-6 py-8 text-center text-gray-500">暂无视频，点击右上角添加</td></tr>';
+                        return;
+                    }
+
+                    tbody.innerHTML = videos.map(v => `
+                        <tr class="hover:bg-gray-800/30 transition-colors">
+                            <td class="px-6 py-4">
+                                <img src="${v.coverUrl}" class="w-16 h-10 object-cover rounded-lg bg-gray-700" 
+                                    onerror="this.src='https://via.placeholder.com/160x90?text=No+Cover'">
+                            </td>
+                            <td class="px-6 py-4 font-medium text-white">${v.title}</td>
+                            <td class="px-6 py-4">
+                                ${v.sourceType === 'url' 
+                                    ? '<span class="px-2 py-1 rounded-full text-xs bg-blue-500/20 text-blue-400"><i class="fas fa-link mr-1"></i>链接</span>' 
+                                    : '<span class="px-2 py-1 rounded-full text-xs bg-green-500/20 text-green-400"><i class="fas fa-cloud mr-1"></i>OSS</span>'}
+                            </td>
+                            <td class="px-6 py-4">
+                                ${v.isVip 
+                                    ? '<span class="px-2 py-1 rounded-full text-xs font-bold bg-amber-500/20 text-amber-400">VIP</span>' 
+                                    : '<span class="px-2 py-1 rounded-full text-xs bg-gray-700 text-gray-400">免费</span>'}
+                            </td>
+                            <td class="px-6 py-4 text-right">
+                                <button onclick="adminController.playVideo(${v.id})" class="text-green-400 hover:text-green-300 mr-3 transition-colors">
+                                    <i class="fas fa-play-circle"></i>
+                                </button>
+                                <button onclick="adminController.deleteVideo(${v.id})" class="text-red-400 hover:text-red-300 transition-colors">
+                                    <i class="fas fa-trash"></i>
+                                </button>
+                            </td>
+                        </tr>
+                    `).join('');
+                } catch (error) {
+                    console.error('渲染视频列表失败:', error);
+                }
+            },
+
+            // 页面切换
+            showVideoManager() {
+                this.state.currentPage = 'video';
+                document.getElementById('accountPage').style.display = 'none';
+                document.getElementById('videoPage').style.display = 'block';
+                this.renderVideos();
+            },
+
+            showAccountManager() {
+                this.state.currentPage = 'account';
+                document.getElementById('accountPage').style.display = 'block';
+                document.getElementById('videoPage').style.display = 'none';
+                this.renderUsers();
+            },
+
+            // ========== 用户管理 ==========
+            
+            // 打开用户模态框
+            openUserModal() {
+                document.getElementById('userModal').style.display = 'flex';
+                document.getElementById('userModalTitle').textContent = '添加账号';
+                document.getElementById('editUserId').value = '';
+                document.getElementById('newUsername').value = '';
+                document.getElementById('newPassword').value = '';
+                document.getElementById('isVip').checked = false;
+            },
+
+            // 关闭用户模态框
+            closeUserModal() {
+                document.getElementById('userModal').style.display = 'none';
+            },
+
+            // 保存用户
+            async saveUser() {
+                const id = document.getElementById('editUserId').value;
+                const username = document.getElementById('newUsername').value.trim();
+                const password = document.getElementById('newPassword').value;
+                const isVip = document.getElementById('isVip').checked;
+
+                if (!username || !password) {
+                    alert('请填写完整信息');
+                    return;
+                }
+
+                try {
+                    if (id) {
+                        // 更新
+                        await userService.updateUser(parseInt(id), { username, password, isVip });
+                        utils.showToast('更新成功');
+                    } else {
+                        // 创建
+                        await userService.createUser({ username, password, isVip });
+                        utils.showToast('创建成功');
+                    }
+                    
+                    this.closeUserModal();
+                    await this.renderUsers();
+                } catch (error) {
+                    alert(error.message);
+                }
+            },
+
+            // 编辑用户
+            async editUser(id) {
+                try {
+                    const user = await userService.getUserById(id);
+                    if (!user) return;
+
+                    this.openUserModal();
+                    document.getElementById('userModalTitle').textContent = '编辑账号';
+                    document.getElementById('editUserId').value = user.id;
+                    document.getElementById('newUsername').value = user.username;
+                    document.getElementById('newPassword').value = user.password;
+                    document.getElementById('isVip').checked = user.isVip;
+                } catch (error) {
+                    console.error('获取用户信息失败:', error);
+                }
+            },
+
+            // 删除用户
+            async deleteUser(id) {
+                if (!utils.confirm('确定删除该用户？此操作不可恢复。')) return;
+
+                try {
+                    await userService.deleteUser(id);
+                    utils.showToast('删除成功');
+                    await this.renderUsers();
+                } catch (error) {
+                    alert(error.message);
+                }
+            },
+
+            // ========== 视频管理 ==========
+
+            // 打开视频模态框
+            openVideoModal() {
+                document.getElementById('videoModal').style.display = 'flex';
+                this.resetUploadForm();
+                this.switchUploadMode('local');
+            },
+
+            // 关闭视频模态框
+            closeVideoModal() {
+                document.getElementById('videoModal').style.display = 'none';
+                
+                // 销毁播放器
+                if (this.state.players.dp) {
+                    this.state.players.dp.destroy();
+                    this.state.players.dp = null;
+                }
+                if (this.state.players.urlDp) {
+                    this.state.players.urlDp.destroy();
+                    this.state.players.urlDp = null;
+                }
+                
+                // 取消正在上传的请求
+                adminService.cancelUpload();
+            },
+
+            // 重置表单
+            resetUploadForm() {
+                this.state.selectedFiles = { cover: null, video: null };
+                
+                // 重置本地上传面板
+                document.getElementById('localVideoTitle').value = '';
+                document.getElementById('localVideoCategory').value = 'movie';
+                document.getElementById('localVideoRating').value = '8.0';
+                document.getElementById('localVideoDesc').value = '';
+                document.getElementById('localIsVipVideo').checked = false;
+                
+                ['cover', 'video'].forEach(type => {
+                    document.getElementById(type + 'Input').value = '';
+                    document.getElementById(type + 'Placeholder').classList.remove('hidden');
+                    document.getElementById(type + 'Preview').classList.add('hidden');
+                    document.getElementById(type + 'Zone').classList.remove('has-file');
+                });
+                
+                document.getElementById('uploadProgress').classList.add('hidden');
+                document.getElementById('localUploadBtn').disabled = true;
+                
+                // 重置URL面板
+                document.getElementById('urlVideoTitle').value = '';
+                document.getElementById('urlCoverInput').value = '';
+                document.getElementById('urlVideoInput').value = '';
+                document.getElementById('urlCoverPreview').classList.add('hidden');
+                document.getElementById('urlPlayerContainer').classList.add('hidden');
+                document.getElementById('urlVideoCategory').value = 'movie';
+                document.getElementById('urlVideoRating').value = '8.0';
+                document.getElementById('urlVideoDesc').value = '';
+                document.getElementById('urlIsVipVideo').checked = false;
+                document.getElementById('urlSaveBtn').disabled = true;
+            },
+
+            // 切换上传模式
+            switchUploadMode(mode) {
+                this.state.uploadMode = mode;
+                
+                const tabLocal = document.getElementById('tabLocal');
+                const tabUrl = document.getElementById('tabUrl');
+                const localPanel = document.getElementById('localUploadPanel');
+                const urlPanel = document.getElementById('urlUploadPanel');
+                
+                if (mode === 'local') {
+                    tabLocal.className = 'flex-1 py-2 px-4 rounded-lg font-medium transition-all tab-active';
+                    tabUrl.className = 'flex-1 py-2 px-4 rounded-lg font-medium transition-all tab-inactive';
+                    localPanel.classList.remove('hidden');
+                    urlPanel.classList.add('hidden');
+                    
+                    if (this.state.players.urlDp) {
+                        this.state.players.urlDp.destroy();
+                        this.state.players.urlDp = null;
+                    }
+                } else {
+                    tabLocal.className = 'flex-1 py-2 px-4 rounded-lg font-medium transition-all tab-inactive';
+                    tabUrl.className = 'flex-1 py-2 px-4 rounded-lg font-medium transition-all tab-active';
+                    localPanel.classList.add('hidden');
+                    urlPanel.classList.remove('hidden');
+                }
+            },
+
+            // 文件选择处理
+            handleFileSelect(type, input) {
+                const file = input.files[0];
+                if (!file) return;
+
+                // 验证文件
+                if (type === 'cover') {
+                    if (!file.type.startsWith('image/')) {
+                        alert('请选择图片文件');
+                        return;
+                    }
+                    if (file.size > config.UPLOAD_LIMITS.coverMaxSize) {
+                        alert(`封面不能超过${utils.formatSize(config.UPLOAD_LIMITS.coverMaxSize)}`);
+                        return;
+                    }
+                } else if (type === 'video') {
+                    if (!config.UPLOAD_LIMITS.allowedVideoTypes.includes(file.type)) {
+                        alert('请选择 MP4、WebM 或 MOV 格式');
+                        return;
+                    }
+                    if (file.size > config.UPLOAD_LIMITS.videoMaxSize) {
+                        alert(`视频不能超过${utils.formatSize(config.UPLOAD_LIMITS.videoMaxSize)}`);
+                        return;
+                    }
+                }
+
+                this.state.selectedFiles[type] = file;
+                
+                // 更新UI
+                document.getElementById(type + 'Placeholder').classList.add('hidden');
+                document.getElementById(type + 'Preview').classList.remove('hidden');
+                document.getElementById(type + 'Zone').classList.add('has-file');
+                
+                if (type === 'cover') {
+                    const reader = new FileReader();
+                    reader.onload = (e) => {
+                        document.querySelector('#coverPreview img').src = e.target.result;
+                    };
+                    reader.readAsDataURL(file);
+                } else {
+                    document.getElementById('videoFileName').textContent = file.name;
+                }
+                
+                this.checkCanUploadLocal();
+            },
+
+            // 清除文件
+            clearFile(type) {
+                this.state.selectedFiles[type] = null;
+                document.getElementById(type + 'Input').value = '';
+                document.getElementById(type + 'Placeholder').classList.remove('hidden');
+                document.getElementById(type + 'Preview').classList.add('hidden');
+                document.getElementById(type + 'Zone').classList.remove('has-file');
+                this.checkCanUploadLocal();
+            },
+
+            // 检查是否可以上传
+            checkCanUploadLocal() {
+                const canUpload = this.state.selectedFiles.cover && 
+                                 this.state.selectedFiles.video && 
+                                 document.getElementById('localVideoTitle').value.trim();
+                document.getElementById('localUploadBtn').disabled = !canUpload;
+            },
+
+            // 执行本地上传
+            async uploadLocalVideo() {
+                const title = document.getElementById('localVideoTitle').value.trim();
+                if (!title || !this.state.selectedFiles.cover || !this.state.selectedFiles.video) {
+                    alert('请填写完整信息');
+                    return;
+                }
+
+                // 显示进度
+                const progressDiv = document.getElementById('uploadProgress');
+                const progressBar = document.getElementById('progressBar');
+                const uploadPercent = document.getElementById('uploadPercent');
+                const uploadStatus = document.getElementById('uploadStatus');
+                const uploadBtn = document.getElementById('localUploadBtn');
+                
+                progressDiv.classList.remove('hidden');
+                uploadBtn.disabled = true;
+
+                // 构建表单数据
+                const formData = new FormData();
+                formData.append('cover', this.state.selectedFiles.cover);
+                formData.append('video', this.state.selectedFiles.video);
+                formData.append('title', title);
+                formData.append('category', document.getElementById('localVideoCategory').value);
+                formData.append('rating', document.getElementById('localVideoRating').value);
+                formData.append('desc', document.getElementById('localVideoDesc').value);
+                formData.append('isVip', document.getElementById('localIsVipVideo').checked);
+
+                try {
+                    await adminService.uploadLocalVideo(formData, (percent) => {
+                        progressBar.style.width = percent + '%';
+                        uploadPercent.textContent = percent + '%';
+                        uploadStatus.textContent = percent < 100 ? `上传中 ${percent}%` : '处理中...';
+                    });
+
+                    utils.showToast('上传成功');
+                    this.closeVideoModal();
+                    await this.renderVideos();
+                } catch (error) {
+                    alert(error.message);
+                    uploadBtn.disabled = false;
+                }
+            },
+
+            // 预览URL封面
+            previewUrlCover() {
+                const url = document.getElementById('urlCoverInput').value.trim();
+                const preview = document.getElementById('urlCoverPreview');
+                const img = document.getElementById('urlCoverImg');
+                const loading = document.getElementById('urlCoverLoading');
+                
+                if (!url) {
+                    preview.classList.add('hidden');
+                    return;
+                }
+                
+                preview.classList.remove('hidden');
+                loading.classList.remove('hidden');
+                
+                img.onload = () => loading.classList.add('hidden');
+                img.onerror = () => loading.classList.add('hidden');
+                img.src = url;
+                
+                this.checkCanSaveUrl();
+            },
+
+            // 测试视频URL
+            testVideoUrl() {
+                const url = document.getElementById('urlVideoInput').value.trim();
+                if (!url) {
+                    alert('请输入视频链接');
+                    return;
+                }
+
+                document.getElementById('urlPlayerContainer').classList.remove('hidden');
+                
+                if (this.state.players.urlDp) {
+                    this.state.players.urlDp.destroy();
+                }
+
+                this.state.players.urlDp = new DPlayer({
+                    container: document.getElementById('urlPreviewPlayer'),
+                    video: {
+                        url: url,
+                        type: utils.isHLS(url) ? 'hls' : 'auto'
+                    },
+                    autoplay: false,
+                    theme: '#00d4ff',
+                    lang: 'zh-cn'
+                });
+
+                this.checkCanSaveUrl();
+            },
+
+            // 检查是否可以保存URL视频
+            checkCanSaveUrl() {
+                const title = document.getElementById('urlVideoTitle').value.trim();
+                const coverUrl = document.getElementById('urlCoverInput').value.trim();
+                const videoUrl = document.getElementById('urlVideoInput').value.trim();
+                
+                const canSave = title && coverUrl && videoUrl;
+                document.getElementById('urlSaveBtn').disabled = !canSave;
+            },
+
+            // 保存URL视频
+            async saveUrlVideo() {
+                const videoData = {
+                    title: document.getElementById('urlVideoTitle').value.trim(),
+                    coverUrl: document.getElementById('urlCoverInput').value.trim(),
+                    videoUrl: document.getElementById('urlVideoInput').value.trim(),
+                    category: document.getElementById('urlVideoCategory').value,
+                    rating: document.getElementById('urlVideoRating').value,
+                    desc: document.getElementById('urlVideoDesc').value.trim(),
+                    isVip: document.getElementById('urlIsVipVideo').checked
+                };
+
+                try {
+                    await videoService.createVideo(videoData);
+                    utils.showToast('保存成功');
+                    this.closeVideoModal();
+                    await this.renderVideos();
+                } catch (error) {
+                    alert(error.message);
+                }
+            },
+
+            // 播放视频
+            async playVideo(id) {
+                try {
+                    const video = await videoService.getVideoById(id);
+                    if (!video) return;
+
+                    this.state.currentVideo = video;
+                    document.getElementById('previewTitle').textContent = video.title;
+                    document.getElementById('previewModal').style.display = 'flex';
+
+                    if (this.state.players.previewDp) {
+                        this.state.players.previewDp.destroy();
+                    }
+
+                    this.state.players.previewDp = new DPlayer({
+                        container: document.getElementById('previewPlayer'),
+                        video: { 
+                            url: video.videoUrl, 
+                            type: utils.isHLS(video.videoUrl) ? 'hls' : 'auto', 
+                            pic: video.coverUrl 
+                        },
+                        autoplay: true,
+                        theme: '#00d4ff',
+                        lang: 'zh-cn',
+                        screenshot: true
+                    });
+                } catch (error) {
+                    console.error('播放视频失败:', error);
+                }
+            },
+
+            // 关闭预览
+            closePreview() {
+                document.getElementById('previewModal').style.display = 'none';
+                if (this.state.players.previewDp) {
+                    this.state.players.previewDp.destroy();
+                    this.state.players.previewDp = null;
+                }
+            },
+
+            // 删除视频
+            async deleteVideo(id) {
+                if (!utils.confirm('确定删除该视频？此操作不可恢复。')) return;
+
+                try {
+                    await videoService.deleteVideo(id);
+                    utils.showToast('删除成功');
+                    await this.renderVideos();
+                } catch (error) {
+                    alert(error.message);
+                }
+            },
+
+            // 关闭所有模态框
+            closeAllModals() {
+                this.closeUserModal();
+                this.closeVideoModal();
+                this.closePreview();
+            }
+        };
+
+        // 初始化控制器
+        document.addEventListener('DOMContentLoaded', () => {
+            adminController.init();
+        });
+    </script>
+
+    <!-- ==================== HTML结构 ==================== -->
+    
     <!-- 登录页 -->
     <div id="loginPage" style="position:fixed;inset:0;display:flex;align-items:center;justify-content:center;z-index:100;background:linear-gradient(to bottom right, #111827, #1e3a8a, #111827);">
         <div class="glass rounded-2xl p-8 w-full max-w-md shadow-2xl mx-4">
@@ -65,7 +1295,7 @@
                     <input type="password" id="password" class="w-full px-4 py-3 rounded-xl bg-gray-800 border border-gray-700 focus:border-cyan-400 outline-none text-white" placeholder="请输入密码" value="666">
                 </div>
                 <div id="errorMsg" style="display:none;" class="text-red-400 text-sm text-center bg-red-400/10 py-2 rounded-lg"></div>
-                <button type="button" onclick="doLogin()" class="w-full py-3 bg-gradient-to-r from-cyan-400 to-purple-600 rounded-xl font-bold hover:opacity-90 transition-opacity">登录系统</button>
+                <button type="button" onclick="adminController.doLogin()" class="w-full py-3 bg-gradient-to-r from-cyan-400 to-purple-600 rounded-xl font-bold hover:opacity-90 transition-opacity">登录系统</button>
             </form>
         </div>
     </div>
@@ -73,19 +1303,19 @@
     <!-- 管理面板 -->
     <div id="dashboardPage" style="display:none;min-height:100vh;">
         <nav class="glass sticky top-0 z-50 px-6 py-4 flex justify-between items-center">
-            <div class="flex items-center gap-3 cursor-pointer" onclick="showAccountManager()">
+            <div class="flex items-center gap-3 cursor-pointer" onclick="adminController.showAccountManager()">
                 <div class="w-8 h-8 rounded-lg bg-gradient-to-br from-cyan-400 to-purple-600 flex items-center justify-center text-white font-bold">G</div>
                 <span class="text-xl font-bold gradient-text">GDX 管理平台</span>
             </div>
             <div class="flex items-center gap-4">
-                <button onclick="showVideoManager()" class="px-4 py-2 bg-cyan-400/20 text-cyan-400 rounded-lg hover:bg-cyan-400/30 text-sm">
+                <button onclick="adminController.showVideoManager()" class="px-4 py-2 bg-cyan-400/20 text-cyan-400 rounded-lg hover:bg-cyan-400/30 text-sm">
                     <i class="fas fa-video mr-2"></i>视频管理
                 </button>
-                <button onclick="showAccountManager()" class="px-4 py-2 bg-gray-700 text-gray-300 rounded-lg hover:bg-gray-600 text-sm">
+                <button onclick="adminController.showAccountManager()" class="px-4 py-2 bg-gray-700 text-gray-300 rounded-lg hover:bg-gray-600 text-sm">
                     <i class="fas fa-users mr-2"></i>账号管理
                 </button>
                 <span class="text-sm text-gray-400">超级管理员</span>
-                <button onclick="doLogout()" class="px-4 py-2 bg-red-500/20 text-red-400 rounded-lg hover:bg-red-500/30 text-sm">退出</button>
+                <button onclick="adminController.doLogout()" class="px-4 py-2 bg-red-500/20 text-red-400 rounded-lg hover:bg-red-500/30 text-sm">退出</button>
             </div>
         </nav>
 
@@ -112,7 +1342,7 @@
 
             <div class="flex justify-between items-center mb-6">
                 <h2 class="text-2xl font-bold">账号管理</h2>
-                <button onclick="openUserModal()" class="px-6 py-2 bg-cyan-400 text-black font-bold rounded-lg hover:scale-105 transition-transform">+ 添加账号</button>
+                <button onclick="adminController.openUserModal()" class="px-6 py-2 bg-cyan-400 text-black font-bold rounded-lg hover:scale-105 transition-transform">+ 添加账号</button>
             </div>
 
             <div class="glass rounded-xl overflow-hidden">
@@ -135,7 +1365,7 @@
         <div id="videoPage" style="display:none;" class="max-w-7xl mx-auto px-6 py-8">
             <div class="flex justify-between items-center mb-6">
                 <h2 class="text-2xl font-bold">视频管理</h2>
-                <button onclick="openVideoModal()" class="px-6 py-2 bg-cyan-400 text-black font-bold rounded-lg hover:scale-105 transition-transform">
+                <button onclick="adminController.openVideoModal()" class="px-6 py-2 bg-cyan-400 text-black font-bold rounded-lg hover:scale-105 transition-transform">
                     <i class="fas fa-cloud-upload-alt mr-2"></i>添加视频
                 </button>
             </div>
@@ -180,7 +1410,7 @@
     <div id="userModal" style="display:none;" class="fixed inset-0 z-[60] flex items-center justify-center bg-black/80 backdrop-blur-sm">
         <div class="glass rounded-2xl p-6 w-full max-w-md mx-4">
             <h3 class="text-xl font-bold mb-6" id="userModalTitle">添加账号</h3>
-            <form onsubmit="saveUser(); return false;" class="space-y-4">
+            <form onsubmit="adminController.saveUser(); return false;" class="space-y-4">
                 <input type="hidden" id="editUserId">
                 <input type="text" id="newUsername" required class="w-full px-4 py-3 rounded-xl bg-gray-800 border border-gray-700 focus:border-cyan-400 outline-none text-white" placeholder="账号">
                 <input type="text" id="newPassword" required class="w-full px-4 py-3 rounded-xl bg-gray-800 border border-gray-700 focus:border-cyan-400 outline-none text-white" placeholder="密码">
@@ -188,40 +1418,35 @@
                     <input type="checkbox" id="isVip" class="w-5 h-5 rounded bg-gray-800 border-gray-700 text-cyan-400"> VIP账号
                 </label>
                 <div class="flex gap-3 pt-4">
-                    <button type="button" onclick="closeUserModal()" class="flex-1 py-3 bg-gray-700 rounded-xl hover:bg-gray-600">取消</button>
+                    <button type="button" onclick="adminController.closeUserModal()" class="flex-1 py-3 bg-gray-700 rounded-xl hover:bg-gray-600">取消</button>
                     <button type="submit" class="flex-1 py-3 bg-cyan-400 text-black font-bold rounded-xl">保存</button>
                 </div>
             </form>
         </div>
     </div>
 
-    <!-- 【双模式】视频上传模态框 - 支持本地上传和URL上传 -->
+    <!-- 视频上传模态框 -->
     <div id="videoModal" style="display:none;" class="fixed inset-0 z-[60] flex items-center justify-center bg-black/80 backdrop-blur-sm p-4">
         <div class="glass rounded-2xl w-full max-w-2xl max-h-[90vh] overflow-hidden flex flex-col">
-            <!-- 头部 -->
             <div class="flex justify-between items-center p-6 border-b border-gray-700">
                 <h3 class="text-xl font-bold">添加视频</h3>
-                <button onclick="closeVideoModal()" class="w-8 h-8 rounded-full bg-gray-700 flex items-center justify-center hover:bg-gray-600 transition-colors">
+                <button onclick="adminController.closeVideoModal()" class="w-8 h-8 rounded-full bg-gray-700 flex items-center justify-center hover:bg-gray-600 transition-colors">
                     <i class="fas fa-times"></i>
                 </button>
             </div>
 
-            <!-- 上传方式切换标签 -->
             <div class="flex p-4 gap-2 border-b border-gray-700">
-                <button onclick="switchUploadMode('local')" id="tabLocal" class="flex-1 py-2 px-4 rounded-lg font-medium transition-all tab-active">
+                <button onclick="adminController.switchUploadMode('local')" id="tabLocal" class="flex-1 py-2 px-4 rounded-lg font-medium transition-all tab-active">
                     <i class="fas fa-upload mr-2"></i>本地上传
                 </button>
-                <button onclick="switchUploadMode('url')" id="tabUrl" class="flex-1 py-2 px-4 rounded-lg font-medium transition-all tab-inactive">
+                <button onclick="adminController.switchUploadMode('url')" id="tabUrl" class="flex-1 py-2 px-4 rounded-lg font-medium transition-all tab-inactive">
                     <i class="fas fa-link mr-2"></i>链接导入
                 </button>
             </div>
 
-            <!-- 内容区域 -->
             <div class="flex-1 overflow-y-auto p-6">
-                
-                <!-- 本地上传模式 -->
+                <!-- 本地上传面板 -->
                 <div id="localUploadPanel" class="space-y-4">
-                    <!-- 上传进度 -->
                     <div id="uploadProgress" class="hidden">
                         <div class="flex justify-between text-sm mb-2">
                             <span class="text-cyan-400" id="uploadStatus">准备上传...</span>
@@ -232,19 +1457,16 @@
                         </div>
                     </div>
 
-                    <!-- 标题 -->
                     <div>
                         <label class="block text-sm text-gray-400 mb-2">视频标题 <span class="text-red-400">*</span></label>
                         <input type="text" id="localVideoTitle" class="w-full px-4 py-3 rounded-xl bg-gray-800 border border-gray-700 focus:border-cyan-400 outline-none text-white transition-colors" placeholder="请输入视频标题">
                     </div>
 
-                    <!-- 文件上传区域 -->
                     <div class="grid grid-cols-2 gap-4">
-                        <!-- 封面上传 -->
                         <div>
                             <label class="block text-sm text-gray-400 mb-2">封面图片 <span class="text-red-400">*</span></label>
                             <div id="coverZone" class="upload-zone rounded-xl p-4 cursor-pointer relative h-32 flex items-center justify-center" onclick="document.getElementById('coverInput').click()">
-                                <input type="file" id="coverInput" accept="image/*" class="hidden" onchange="handleFileSelect('cover', this)">
+                                <input type="file" id="coverInput" accept="image/*" class="hidden" onchange="adminController.handleFileSelect('cover', this)">
                                 <div id="coverPlaceholder" class="text-center">
                                     <i class="fas fa-image text-3xl text-gray-500 mb-2"></i>
                                     <p class="text-sm text-gray-400">点击上传封面</p>
@@ -252,18 +1474,17 @@
                                 </div>
                                 <div id="coverPreview" class="hidden absolute inset-0 p-2">
                                     <img class="w-full h-full object-cover rounded-lg">
-                                    <button onclick="event.stopPropagation(); clearFile('cover')" class="absolute top-1 right-1 w-6 h-6 bg-red-500 rounded-full text-white text-xs flex items-center justify-center hover:bg-red-600 transition-colors">
+                                    <button onclick="event.stopPropagation(); adminController.clearFile('cover')" class="absolute top-1 right-1 w-6 h-6 bg-red-500 rounded-full text-white text-xs flex items-center justify-center hover:bg-red-600 transition-colors">
                                         <i class="fas fa-times"></i>
                                     </button>
                                 </div>
                             </div>
                         </div>
 
-                        <!-- 视频上传 -->
                         <div>
                             <label class="block text-sm text-gray-400 mb-2">视频文件 <span class="text-red-400">*</span></label>
                             <div id="videoZone" class="upload-zone rounded-xl p-4 cursor-pointer relative h-32 flex items-center justify-center" onclick="document.getElementById('videoInput').click()">
-                                <input type="file" id="videoInput" accept="video/*" class="hidden" onchange="handleFileSelect('video', this)">
+                                <input type="file" id="videoInput" accept="video/*" class="hidden" onchange="adminController.handleFileSelect('video', this)">
                                 <div id="videoPlaceholder" class="text-center">
                                     <i class="fas fa-film text-3xl text-gray-500 mb-2"></i>
                                     <p class="text-sm text-gray-400">点击上传视频</p>
@@ -272,7 +1493,7 @@
                                 <div id="videoPreview" class="hidden absolute inset-0 p-2 flex flex-col items-center justify-center">
                                     <i class="fas fa-check-circle text-green-400 text-4xl mb-2"></i>
                                     <p class="text-sm text-gray-300 truncate max-w-full px-2" id="videoFileName"></p>
-                                    <button onclick="event.stopPropagation(); clearFile('video')" class="mt-2 px-3 py-1 bg-red-500/80 rounded-full text-white text-xs hover:bg-red-500 transition-colors">
+                                    <button onclick="event.stopPropagation(); adminController.clearFile('video')" class="mt-2 px-3 py-1 bg-red-500/80 rounded-full text-white text-xs hover:bg-red-500 transition-colors">
                                         <i class="fas fa-trash-alt mr-1"></i>移除
                                     </button>
                                 </div>
@@ -280,7 +1501,6 @@
                         </div>
                     </div>
 
-                    <!-- 其他信息 -->
                     <div class="grid grid-cols-3 gap-4">
                         <div>
                             <label class="block text-sm text-gray-400 mb-2">分类</label>
@@ -304,39 +1524,34 @@
                         </div>
                     </div>
 
-                    <!-- 简介 -->
                     <div>
                         <label class="block text-sm text-gray-400 mb-2">视频简介</label>
                         <textarea id="localVideoDesc" rows="3" class="w-full px-4 py-3 rounded-xl bg-gray-800 border border-gray-700 focus:border-cyan-400 outline-none text-white resize-none" placeholder="请输入视频简介（可选）..."></textarea>
                     </div>
 
-                    <!-- 按钮 -->
                     <div class="flex gap-3 pt-2">
-                        <button type="button" onclick="closeVideoModal()" class="flex-1 py-3 bg-gray-700 rounded-xl hover:bg-gray-600 transition-colors font-medium">取消</button>
-                        <button type="button" onclick="uploadLocalVideo()" id="localUploadBtn" disabled class="flex-1 py-3 bg-cyan-400 text-black font-bold rounded-xl hover:opacity-90 transition-opacity disabled:opacity-50 disabled:cursor-not-allowed">
+                        <button type="button" onclick="adminController.closeVideoModal()" class="flex-1 py-3 bg-gray-700 rounded-xl hover:bg-gray-600 transition-colors font-medium">取消</button>
+                        <button type="button" onclick="adminController.uploadLocalVideo()" id="localUploadBtn" disabled class="flex-1 py-3 bg-cyan-400 text-black font-bold rounded-xl hover:opacity-90 transition-opacity disabled:opacity-50 disabled:cursor-not-allowed">
                             <i class="fas fa-cloud-upload-alt mr-2"></i>开始上传
                         </button>
                     </div>
                 </div>
 
-                <!-- URL导入模式 -->
+                <!-- URL上传面板 -->
                 <div id="urlUploadPanel" class="hidden space-y-4">
-                    <!-- 标题 -->
                     <div>
                         <label class="block text-sm text-gray-400 mb-2">视频标题 <span class="text-red-400">*</span></label>
                         <input type="text" id="urlVideoTitle" class="w-full px-4 py-3 rounded-xl bg-gray-800 border border-gray-700 focus:border-cyan-400 outline-none text-white transition-colors" placeholder="请输入视频标题">
                     </div>
 
-                    <!-- 封面URL -->
                     <div>
                         <label class="block text-sm text-gray-400 mb-2">封面图片URL <span class="text-red-400">*</span></label>
                         <div class="flex gap-2">
-                            <input type="url" id="urlCoverInput" class="flex-1 px-4 py-3 rounded-xl bg-gray-800 border border-gray-700 focus:border-cyan-400 outline-none text-white url-input transition-all" placeholder="https://example.com/cover.jpg" oninput="previewUrlCover()">
-                            <button onclick="previewUrlCover()" class="px-4 py-3 bg-gray-700 rounded-xl hover:bg-gray-600 transition-colors">
+                            <input type="url" id="urlCoverInput" class="flex-1 px-4 py-3 rounded-xl bg-gray-800 border border-gray-700 focus:border-cyan-400 outline-none text-white url-input transition-all" placeholder="https://example.com/cover.jpg" oninput="adminController.previewUrlCover()">
+                            <button onclick="adminController.previewUrlCover()" class="px-4 py-3 bg-gray-700 rounded-xl hover:bg-gray-600 transition-colors">
                                 <i class="fas fa-eye"></i>
                             </button>
                         </div>
-                        <!-- 封面预览 -->
                         <div id="urlCoverPreview" class="hidden mt-3 rounded-xl overflow-hidden bg-gray-800 h-40 relative">
                             <img id="urlCoverImg" class="w-full h-full object-cover" onerror="this.src='https://via.placeholder.com/640x360?text=Invalid+Image'">
                             <div class="absolute inset-0 flex items-center justify-center bg-black/50 hidden" id="urlCoverLoading">
@@ -345,12 +1560,11 @@
                         </div>
                     </div>
 
-                    <!-- 视频URL -->
                     <div>
                         <label class="block text-sm text-gray-400 mb-2">视频链接URL <span class="text-red-400">*</span></label>
                         <div class="flex gap-2">
                             <input type="url" id="urlVideoInput" class="flex-1 px-4 py-3 rounded-xl bg-gray-800 border border-gray-700 focus:border-cyan-400 outline-none text-white url-input transition-all" placeholder="https://example.com/video.mp4 或 .m3u8">
-                            <button onclick="testVideoUrl()" class="px-4 py-3 bg-gray-700 rounded-xl hover:bg-gray-600 transition-colors whitespace-nowrap">
+                            <button onclick="adminController.testVideoUrl()" class="px-4 py-3 bg-gray-700 rounded-xl hover:bg-gray-600 transition-colors whitespace-nowrap">
                                 <i class="fas fa-play mr-1"></i>测试
                             </button>
                         </div>
@@ -360,13 +1574,11 @@
                         </p>
                     </div>
 
-                    <!-- 视频预览播放器 -->
                     <div id="urlPlayerContainer" class="hidden">
                         <label class="block text-sm text-gray-400 mb-2">视频预览</label>
                         <div id="urlPreviewPlayer" class="w-full aspect-video"></div>
                     </div>
 
-                    <!-- 其他信息 -->
                     <div class="grid grid-cols-3 gap-4">
                         <div>
                             <label class="block text-sm text-gray-400 mb-2">分类</label>
@@ -390,16 +1602,14 @@
                         </div>
                     </div>
 
-                    <!-- 简介 -->
                     <div>
                         <label class="block text-sm text-gray-400 mb-2">视频简介</label>
                         <textarea id="urlVideoDesc" rows="3" class="w-full px-4 py-3 rounded-xl bg-gray-800 border border-gray-700 focus:border-cyan-400 outline-none text-white resize-none" placeholder="请输入视频简介（可选）..."></textarea>
                     </div>
 
-                    <!-- 按钮 -->
                     <div class="flex gap-3 pt-2">
-                        <button type="button" onclick="closeVideoModal()" class="flex-1 py-3 bg-gray-700 rounded-xl hover:bg-gray-600 transition-colors font-medium">取消</button>
-                        <button type="button" onclick="saveUrlVideo()" id="urlSaveBtn" disabled class="flex-1 py-3 bg-gradient-to-r from-cyan-400 to-purple-500 text-black font-bold rounded-xl hover:opacity-90 transition-opacity disabled:opacity-50 disabled:cursor-not-allowed">
+                        <button type="button" onclick="adminController.closeVideoModal()" class="flex-1 py-3 bg-gray-700 rounded-xl hover:bg-gray-600 transition-colors font-medium">取消</button>
+                        <button type="button" onclick="adminController.saveUrlVideo()" id="urlSaveBtn" disabled class="flex-1 py-3 bg-gradient-to-r from-cyan-400 to-purple-500 text-black font-bold rounded-xl hover:opacity-90 transition-opacity disabled:opacity-50 disabled:cursor-not-allowed">
                             <i class="fas fa-save mr-2"></i>保存到库
                         </button>
                     </div>
@@ -412,7 +1622,7 @@
     <div id="previewModal" style="display:none;" class="fixed inset-0 z-[70] bg-black flex flex-col">
         <div class="flex items-center justify-between p-4 bg-gray-900 border-b border-gray-800">
             <h3 class="text-lg font-bold" id="previewTitle">视频预览</h3>
-            <button onclick="closePreview()" class="w-10 h-10 rounded-full bg-gray-800 flex items-center justify-center hover:bg-gray-700">
+            <button onclick="adminController.closePreview()" class="w-10 h-10 rounded-full bg-gray-800 flex items-center justify-center hover:bg-gray-700">
                 <i class="fas fa-times"></i>
             </button>
         </div>
@@ -421,563 +1631,5 @@
         </div>
     </div>
 
-    <script>
-        // ========== 数据层 ==========
-        const SUPER_ACCOUNT = { username: 'GDX', password: '666' };
-        
-        function safeGet(key, def) {
-            try {
-                const d = localStorage.getItem(key);
-                return d ? JSON.parse(d) : def;
-            } catch(e) { return def; }
-        }
-        
-        function safeSet(key, val) {
-            try {
-                localStorage.setItem(key, JSON.stringify(val));
-                return true;
-            } catch(e) { 
-                alert('保存失败：存储空间不足');
-                return false; 
-            }
-        }
-        
-        let users = safeGet('gdx_users', [
-            { id: 1, username: 'user001', password: '123456', isVip: true },
-            { id: 2, username: 'test', password: 'test123', isVip: false }
-        ]);
-        
-        let videos = safeGet('gdx_videos', []);
-        let selectedFiles = { cover: null, video: null };
-        let dp = null, previewDp = null, urlDp = null;
-        let currentUploadMode = 'local';
-
-        // ========== 登录 ==========
-        if (localStorage.getItem('gdx_admin_logged_in') === 'true') showDashboard();
-
-        function doLogin() {
-            const u = document.getElementById('username').value.trim();
-            const p = document.getElementById('password').value;
-            const err = document.getElementById('errorMsg');
-            
-            if (u === SUPER_ACCOUNT.username && p === SUPER_ACCOUNT.password) {
-                localStorage.setItem('gdx_admin_logged_in', 'true');
-                err.style.display = 'none';
-                showDashboard();
-            } else {
-                err.textContent = '账号或密码错误！';
-                err.style.display = 'block';
-            }
-        }
-
-        function showDashboard() {
-            document.getElementById('loginPage').style.display = 'none';
-            document.getElementById('dashboardPage').style.display = 'block';
-            renderUsers();
-        }
-
-        function doLogout() {
-            localStorage.removeItem('gdx_admin_logged_in');
-            location.reload();
-        }
-
-        // ========== 账号管理 ==========
-        function renderUsers() {
-            document.getElementById('totalUsers').textContent = users.length;
-            document.getElementById('vipUsers').textContent = users.filter(u => u.isVip).length;
-            document.getElementById('normalUsers').textContent = users.filter(u => !u.isVip).length;
-            
-            document.getElementById('tableBody').innerHTML = users.map(u => `
-                <tr class="hover:bg-gray-800/30">
-                    <td class="px-6 py-4 text-gray-400">#${u.id}</td>
-                    <td class="px-6 py-4 font-medium">${u.username}</td>
-                    <td class="px-6 py-4 text-gray-400">${u.password}</td>
-                    <td class="px-6 py-4">${u.isVip ? '<span class="px-2 py-1 rounded-full text-xs font-bold bg-amber-500/20 text-amber-400">VIP</span>' : '<span class="px-2 py-1 rounded-full text-xs bg-gray-700 text-gray-400">普通</span>'}</td>
-                    <td class="px-6 py-4 text-right">
-                        <button onclick="editUser(${u.id})" class="text-blue-400 hover:text-blue-300 mr-3"><i class="fas fa-edit"></i></button>
-                        <button onclick="deleteUser(${u.id})" class="text-red-400 hover:text-red-300"><i class="fas fa-trash"></i></button>
-                    </td>
-                </tr>
-            `).join('');
-            safeSet('gdx_users', users);
-        }
-
-        function openUserModal() {
-            document.getElementById('userModal').style.display = 'flex';
-            document.getElementById('userModalTitle').textContent = '添加账号';
-            document.getElementById('editUserId').value = '';
-            document.getElementById('newUsername').value = '';
-            document.getElementById('newPassword').value = '';
-            document.getElementById('isVip').checked = false;
-        }
-
-        function closeUserModal() {
-            document.getElementById('userModal').style.display = 'none';
-        }
-
-        function saveUser() {
-            const id = document.getElementById('editUserId').value;
-            const username = document.getElementById('newUsername').value.trim();
-            const password = document.getElementById('newPassword').value;
-            const isVip = document.getElementById('isVip').checked;
-            
-            if (!username || !password) {
-                alert('请填写完整信息');
-                return;
-            }
-            
-            if (id) {
-                const idx = users.findIndex(u => u.id == id);
-                if (idx !== -1) users[idx] = { ...users[idx], username, password, isVip };
-            } else {
-                const newId = users.length > 0 ? Math.max(...users.map(u => u.id)) + 1 : 1;
-                users.push({ id: newId, username, password, isVip });
-            }
-            closeUserModal();
-            renderUsers();
-        }
-
-        function editUser(id) {
-            const u = users.find(x => x.id == id);
-            if (!u) return;
-            openUserModal();
-            document.getElementById('userModalTitle').textContent = '编辑账号';
-            document.getElementById('editUserId').value = u.id;
-            document.getElementById('newUsername').value = u.username;
-            document.getElementById('newPassword').value = u.password;
-            document.getElementById('isVip').checked = u.isVip;
-        }
-
-        function deleteUser(id) {
-            if (!confirm('确定删除？')) return;
-            users = users.filter(u => u.id !== id);
-            renderUsers();
-        }
-
-        // ========== 视频管理 ==========
-        function showVideoManager() {
-            document.getElementById('accountPage').style.display = 'none';
-            document.getElementById('videoPage').style.display = 'block';
-            renderVideos();
-        }
-
-        function showAccountManager() {
-            document.getElementById('accountPage').style.display = 'block';
-            document.getElementById('videoPage').style.display = 'none';
-            renderUsers();
-        }
-
-        function renderVideos() {
-            videos = safeGet('gdx_videos', []);
-            document.getElementById('totalVideos').textContent = videos.length;
-            document.getElementById('vipVideos').textContent = videos.filter(v => v.isVip).length;
-            document.getElementById('freeVideos').textContent = videos.filter(v => !v.isVip).length;
-            
-            const totalSize = videos.reduce((s, v) => s + (v.fileSize || 0), 0);
-            document.getElementById('storageUsed').textContent = formatSize(totalSize);
-            
-            const tbody = document.getElementById('videoTableBody');
-            if (videos.length === 0) {
-                tbody.innerHTML = '<tr><td colspan="5" class="px-6 py-8 text-center text-gray-500">暂无视频，点击右上角添加</td></tr>';
-                return;
-            }
-            
-            tbody.innerHTML = videos.map(v => `
-                <tr class="hover:bg-gray-800/30">
-                    <td class="px-6 py-4"><img src="${v.coverUrl}" class="w-16 h-10 object-cover rounded-lg bg-gray-700" onerror="this.src='https://via.placeholder.com/160x90?text=No+Cover'"></td>
-                    <td class="px-6 py-4 font-medium">${v.title}</td>
-                    <td class="px-6 py-4">
-                        ${v.sourceType === 'url' 
-                            ? '<span class="px-2 py-1 rounded-full text-xs bg-blue-500/20 text-blue-400"><i class="fas fa-link mr-1"></i>链接</span>' 
-                            : '<span class="px-2 py-1 rounded-full text-xs bg-green-500/20 text-green-400"><i class="fas fa-server mr-1"></i>本地</span>'}
-                    </td>
-                    <td class="px-6 py-4">${v.isVip ? '<span class="px-2 py-1 rounded-full text-xs font-bold bg-amber-500/20 text-amber-400">VIP</span>' : '<span class="px-2 py-1 rounded-full text-xs bg-gray-700 text-gray-400">免费</span>'}</td>
-                    <td class="px-6 py-4 text-right">
-                        <button onclick="playVideo(${v.id})" class="text-green-400 hover:text-green-300 mr-3"><i class="fas fa-play-circle"></i></button>
-                        <button onclick="deleteVideo(${v.id})" class="text-red-400 hover:text-red-300"><i class="fas fa-trash"></i></button>
-                    </td>
-                </tr>
-            `).join('');
-        }
-
-        function formatSize(b) {
-            if (!b) return '0 B';
-            const u = ['B', 'KB', 'MB', 'GB'];
-            const i = Math.floor(Math.log(b) / Math.log(1024));
-            return (b / Math.pow(1024, i)).toFixed(1) + ' ' + u[i];
-        }
-
-        // ========== 上传模式切换 ==========
-        function switchUploadMode(mode) {
-            currentUploadMode = mode;
-            
-            const tabLocal = document.getElementById('tabLocal');
-            const tabUrl = document.getElementById('tabUrl');
-            const localPanel = document.getElementById('localUploadPanel');
-            const urlPanel = document.getElementById('urlUploadPanel');
-            
-            if (mode === 'local') {
-                tabLocal.className = 'flex-1 py-2 px-4 rounded-lg font-medium transition-all tab-active';
-                tabUrl.className = 'flex-1 py-2 px-4 rounded-lg font-medium transition-all tab-inactive';
-                localPanel.classList.remove('hidden');
-                urlPanel.classList.add('hidden');
-                if (urlDp) {
-                    urlDp.destroy();
-                    urlDp = null;
-                }
-            } else {
-                tabLocal.className = 'flex-1 py-2 px-4 rounded-lg font-medium transition-all tab-inactive';
-                tabUrl.className = 'flex-1 py-2 px-4 rounded-lg font-medium transition-all tab-active';
-                localPanel.classList.add('hidden');
-                urlPanel.classList.remove('hidden');
-            }
-        }
-
-        // ========== 本地上传逻辑 ==========
-        function openVideoModal() {
-            document.getElementById('videoModal').style.display = 'flex';
-            resetUploadForm();
-            switchUploadMode('local');
-        }
-
-        function closeVideoModal() {
-            document.getElementById('videoModal').style.display = 'none';
-            if (dp) { dp.destroy(); dp = null; }
-            if (urlDp) { urlDp.destroy(); urlDp = null; }
-        }
-
-        function resetUploadForm() {
-            selectedFiles = { cover: null, video: null };
-            
-            document.getElementById('localVideoTitle').value = '';
-            document.getElementById('localVideoCategory').value = 'movie';
-            document.getElementById('localVideoRating').value = '8.0';
-            document.getElementById('localVideoDesc').value = '';
-            document.getElementById('localIsVipVideo').checked = false;
-            
-            ['cover', 'video'].forEach(t => {
-                document.getElementById(t + 'Input').value = '';
-                document.getElementById(t + 'Placeholder').classList.remove('hidden');
-                document.getElementById(t + 'Preview').classList.add('hidden');
-                document.getElementById(t + 'Zone').classList.remove('has-file');
-            });
-            
-            document.getElementById('uploadProgress').classList.add('hidden');
-            document.getElementById('localUploadBtn').disabled = true;
-            
-            document.getElementById('urlVideoTitle').value = '';
-            document.getElementById('urlCoverInput').value = '';
-            document.getElementById('urlVideoInput').value = '';
-            document.getElementById('urlCoverPreview').classList.add('hidden');
-            document.getElementById('urlPlayerContainer').classList.add('hidden');
-            document.getElementById('urlVideoCategory').value = 'movie';
-            document.getElementById('urlVideoRating').value = '8.0';
-            document.getElementById('urlVideoDesc').value = '';
-            document.getElementById('urlIsVipVideo').checked = false;
-            document.getElementById('urlSaveBtn').disabled = true;
-        }
-
-        function handleFileSelect(type, input) {
-            const file = input.files[0];
-            if (!file) return;
-            
-            if (type === 'cover') {
-                if (!file.type.startsWith('image/')) {
-                    alert('请选择图片文件');
-                    return;
-                }
-                if (file.size > 5 * 1024 * 1024) {
-                    alert('封面不能超过5MB');
-                    return;
-                }
-            } else if (type === 'video') {
-                const allowed = ['video/mp4', 'video/webm', 'video/quicktime'];
-                if (!allowed.includes(file.type)) {
-                    alert('请选择 MP4、WebM 或 MOV 格式');
-                    return;
-                }
-                if (file.size > 500 * 1024 * 1024) {
-                    alert('视频不能超过500MB');
-                    return;
-                }
-            }
-            
-            selectedFiles[type] = file;
-            
-            document.getElementById(type + 'Placeholder').classList.add('hidden');
-            document.getElementById(type + 'Preview').classList.remove('hidden');
-            document.getElementById(type + 'Zone').classList.add('has-file');
-            
-            if (type === 'cover') {
-                const reader = new FileReader();
-                reader.onload = (e) => {
-                    document.querySelector('#coverPreview img').src = e.target.result;
-                };
-                reader.readAsDataURL(file);
-            } else {
-                document.getElementById('videoFileName').textContent = file.name;
-            }
-            
-            checkCanUploadLocal();
-        }
-
-        function clearFile(type) {
-            selectedFiles[type] = null;
-            document.getElementById(type + 'Input').value = '';
-            document.getElementById(type + 'Placeholder').classList.remove('hidden');
-            document.getElementById(type + 'Preview').classList.add('hidden');
-            document.getElementById(type + 'Zone').classList.remove('has-file');
-            checkCanUploadLocal();
-        }
-
-        function checkCanUploadLocal() {
-            const can = selectedFiles.cover && selectedFiles.video && document.getElementById('localVideoTitle').value.trim();
-            document.getElementById('localUploadBtn').disabled = !can;
-        }
-
-        document.getElementById('localVideoTitle').addEventListener('input', checkCanUploadLocal);
-
-        async function uploadLocalVideo() {
-            const title = document.getElementById('localVideoTitle').value.trim();
-            if (!title || !selectedFiles.cover || !selectedFiles.video) {
-                alert('请填写完整信息');
-                return;
-            }
-
-            document.getElementById('uploadProgress').classList.remove('hidden');
-            document.getElementById('localUploadBtn').disabled = true;
-
-            const formData = new FormData();
-            formData.append('cover', selectedFiles.cover);
-            formData.append('video', selectedFiles.video);
-
-            const xhr = new XMLHttpRequest();
-            
-            xhr.upload.addEventListener('progress', (e) => {
-                if (e.lengthComputable) {
-                    const p = Math.round((e.loaded / e.total) * 100);
-                    document.getElementById('progressBar').style.width = p + '%';
-                    document.getElementById('uploadPercent').textContent = p + '%';
-                    document.getElementById('uploadStatus').textContent = p < 100 ? `上传中 ${p}%` : '处理中...';
-                }
-            });
-
-            xhr.addEventListener('load', () => {
-                if (xhr.status === 200) {
-                    const result = JSON.parse(xhr.responseText);
-                    
-                    const videoData = {
-                        id: Date.now(),
-                        title: title,
-                        coverUrl: result.cover.url,
-                        videoUrl: result.video.url,
-                        category: document.getElementById('localVideoCategory').value,
-                        rating: parseFloat(document.getElementById('localVideoRating').value) || 8.0,
-                        desc: document.getElementById('localVideoDesc').value.trim(),
-                        isVip: document.getElementById('localIsVipVideo').checked,
-                        fileSize: result.video.size,
-                        sourceType: 'local',
-                        createdAt: new Date().toISOString()
-                    };
-
-                    videos.push(videoData);
-                    
-                    if (safeSet('gdx_videos', videos)) {
-                        window.dispatchEvent(new StorageEvent('storage', {
-                            key: 'gdx_videos',
-                            newValue: JSON.stringify(videos)
-                        }));
-                        
-                        closeVideoModal();
-                        renderVideos();
-                        showToast('上传成功');
-                    }
-                } else {
-                    alert('上传失败');
-                    document.getElementById('localUploadBtn').disabled = false;
-                }
-            });
-
-            xhr.addEventListener('error', () => {
-                alert('网络错误，请检查：\n1. 后端服务器是否启动（192.168.3.22:3000）\n2. 防火墙是否放行3000端口\n3. 电脑IP是否变化');
-                document.getElementById('localUploadBtn').disabled = false;
-            });
-
-            xhr.open('POST', API_BASE + '/upload');
-            xhr.send(formData);
-        }
-
-        // ========== URL上传逻辑 ==========
-        function previewUrlCover() {
-            const url = document.getElementById('urlCoverInput').value.trim();
-            const preview = document.getElementById('urlCoverPreview');
-            const img = document.getElementById('urlCoverImg');
-            const loading = document.getElementById('urlCoverLoading');
-            
-            if (!url) {
-                preview.classList.add('hidden');
-                return;
-            }
-            
-            preview.classList.remove('hidden');
-            loading.classList.remove('hidden');
-            
-            img.onload = () => {
-                loading.classList.add('hidden');
-            };
-            
-            img.onerror = () => {
-                loading.classList.add('hidden');
-            };
-            
-            img.src = url;
-            checkCanSaveUrl();
-        }
-
-        function testVideoUrl() {
-            const url = document.getElementById('urlVideoInput').value.trim();
-            if (!url) {
-                alert('请输入视频链接');
-                return;
-            }
-            
-            document.getElementById('urlPlayerContainer').classList.remove('hidden');
-            
-            if (urlDp) {
-                urlDp.destroy();
-            }
-            
-            const isHLS = url.endsWith('.m3u8') || url.includes('.m3u8');
-            
-            urlDp = new DPlayer({
-                container: document.getElementById('urlPreviewPlayer'),
-                video: {
-                    url: url,
-                    type: isHLS ? 'hls' : 'auto'
-                },
-                autoplay: false,
-                theme: '#00d4ff',
-                lang: 'zh-cn'
-            });
-            
-            checkCanSaveUrl();
-        }
-
-        function checkCanSaveUrl() {
-            const title = document.getElementById('urlVideoTitle').value.trim();
-            const coverUrl = document.getElementById('urlCoverInput').value.trim();
-            const videoUrl = document.getElementById('urlVideoInput').value.trim();
-            
-            const can = title && coverUrl && videoUrl;
-            document.getElementById('urlSaveBtn').disabled = !can;
-        }
-
-        ['urlVideoTitle', 'urlCoverInput', 'urlVideoInput'].forEach(id => {
-            document.getElementById(id).addEventListener('input', checkCanSaveUrl);
-        });
-
-        function saveUrlVideo() {
-            const title = document.getElementById('urlVideoTitle').value.trim();
-            const coverUrl = document.getElementById('urlCoverInput').value.trim();
-            const videoUrl = document.getElementById('urlVideoInput').value.trim();
-            
-            if (!title || !coverUrl || !videoUrl) {
-                alert('请填写完整信息');
-                return;
-            }
-
-            const videoData = {
-                id: Date.now(),
-                title: title,
-                coverUrl: coverUrl,
-                videoUrl: videoUrl,
-                category: document.getElementById('urlVideoCategory').value,
-                rating: parseFloat(document.getElementById('urlVideoRating').value) || 8.0,
-                desc: document.getElementById('urlVideoDesc').value.trim(),
-                isVip: document.getElementById('urlIsVipVideo').checked,
-                fileSize: 0,
-                sourceType: 'url',
-                createdAt: new Date().toISOString()
-            };
-
-            videos.push(videoData);
-            
-            if (safeSet('gdx_videos', videos)) {
-                window.dispatchEvent(new StorageEvent('storage', {
-                    key: 'gdx_videos',
-                    newValue: JSON.stringify(videos)
-                }));
-                
-                closeVideoModal();
-                renderVideos();
-                showToast('保存成功');
-            }
-        }
-
-        // ========== 通用功能 ==========
-        function showToast(msg) {
-            const t = document.createElement('div');
-            t.className = 'fixed top-20 left-1/2 transform -translate-x-1/2 bg-green-500 text-white px-6 py-3 rounded-full shadow-lg z-[100] text-sm';
-            t.innerHTML = `<i class="fas fa-check-circle mr-2"></i>${msg}`;
-            document.body.appendChild(t);
-            setTimeout(() => t.remove(), 3000);
-        }
-
-        function deleteVideo(id) {
-            if (!confirm('确定删除？')) return;
-            videos = videos.filter(v => v.id !== id);
-            if (safeSet('gdx_videos', videos)) {
-                renderVideos();
-                showToast('已删除');
-            }
-        }
-
-        function playVideo(id) {
-            const v = videos.find(x => x.id == id);
-            if (!v) return;
-            
-            document.getElementById('previewTitle').textContent = v.title;
-            document.getElementById('previewModal').style.display = 'flex';
-            
-            if (previewDp) previewDp.destroy();
-            
-            const isHLS = v.videoUrl.endsWith('.m3u8') || v.videoUrl.includes('.m3u8');
-            
-            previewDp = new DPlayer({
-                container: document.getElementById('previewPlayer'),
-                video: { 
-                    url: v.videoUrl, 
-                    type: isHLS ? 'hls' : 'auto', 
-                    pic: v.coverUrl 
-                },
-                autoplay: true,
-                theme: '#00d4ff',
-                lang: 'zh-cn',
-                screenshot: true
-            });
-        }
-
-        function closePreview() {
-            document.getElementById('previewModal').style.display = 'none';
-            if (previewDp) { previewDp.destroy(); previewDp = null; }
-        }
-
-        window.addEventListener('storage', (e) => {
-            if (e.key === 'gdx_videos') {
-                videos = safeGet('gdx_videos', []);
-                if (document.getElementById('videoPage').style.display !== 'none') {
-                    renderVideos();
-                }
-            }
-        });
-
-        document.addEventListener('keydown', (e) => {
-            if (e.key === 'Escape') {
-                closeUserModal();
-                closeVideoModal();
-                closePreview();
-            }
-        });
-    </script>
 </body>
 </html>
